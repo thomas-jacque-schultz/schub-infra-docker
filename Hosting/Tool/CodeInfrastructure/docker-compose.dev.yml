@@ -1,7 +1,19 @@
 name: schub-dev
 
+# Réseaux
+#
+# Deux réseaux, et c'est délibéré (cf. plan §9) :
+#
+#  - `schub-dev` est privé à cette stack. Tout le trafic interne du dev y passe.
+#  - `schub` est l'overlay partagé avec la prod. Seul le front y est attaché, parce que
+#    le tunnel Cloudflare y vit et doit pouvoir le joindre.
+#
+# Les services de dev sont préfixés `dev-`. Sans ça, dev et prod publieraient les mêmes
+# noms courts sur `schub` et le tunnel servirait l'un pour l'autre — le jour où la prod
+# sera déployée, pas avant, ce qui rendrait la panne d'autant plus difficile à lire.
+
 services:
-  schub-mongo:
+  dev-schub-mongo:
     image: mongo:7
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
@@ -9,6 +21,8 @@ services:
       MONGO_INITDB_DATABASE: ${MONGO_DB}
       TZ: Europe/Paris
     volumes:
+      # Volume Docker propre au projet (schub-dev_mongo_data_dev). La prod, elle, bind-monte
+      # /mnt/volume/BotFront/Database : les deux bases ne peuvent pas se toucher.
       - mongo_data_dev:/data/db
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
@@ -16,11 +30,11 @@ services:
       timeout: 5s
       retries: 5
     ports:
-      - "27017:27017"
+      - "127.0.0.1:27017:27017"
     networks:
-      - schub
+      - schub-dev
 
-  connector-discord:
+  dev-connector-discord:
     build:
       context: ../../../../Schub/schub-connector-discord
       dockerfile: Dockerfile.dev
@@ -32,7 +46,7 @@ services:
     environment:
       MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-      MONGO_HOST: schub-mongo
+      MONGO_HOST: dev-schub-mongo
       MONGO_DB: ${MONGO_DB}
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
@@ -40,17 +54,17 @@ services:
       DISCORD_ADMIN_USERNAME: ${DISCORD_ADMIN_USERNAME}
       PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
       PORTAINER_TOKEN: ${PORTAINER_TOKEN}
-      CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
+      CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
       TZ: Europe/Paris
     depends_on:
-      - schub-mongo
-      - connector-freebox
+      - dev-schub-mongo
+      - dev-connector-freebox
     ports:
       - "127.0.0.1:18081:8080"
     networks:
-      - schub
+      - schub-dev
 
-  connector-freebox:
+  dev-connector-freebox:
     build:
       context: ../../../../Schub/schub-connector-freebox
       dockerfile: Dockerfile.dev
@@ -65,31 +79,16 @@ services:
     ports:
       - "127.0.0.1:18084:8080"
     networks:
-      - schub
+      - schub-dev
 
-  schub-front:
-    image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - /home/pisel/projet/Schub/schub-front-servers:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
-    depends_on:
-      - connector-discord
-    networks:
-      - schub
-    ports:
-      - "18090:80"
-    environment:
-      TZ: Europe/Paris
-
-  schub-bff:
+  dev-schub-bff:
     build:
       context: ../../../../Schub/schub-back-bff
       dockerfile: Dockerfile.dev
     volumes:
       - /home/pisel/projet/Schub/schub-back-bff/src:/usr/src/app/src
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@schub-mongo:27017/${SCHUB_MONGO_DB}?authSource=admin
+      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@dev-schub-mongo:27017/${SCHUB_MONGO_DB}?authSource=admin
       AUTH_JWT_SECRET: ${APP_JWT_SECRET:-change-this-jwt-secret-key-with-at-least-32-characters}
       AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-3600}
       AUTH_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
@@ -97,21 +96,44 @@ services:
       AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,https://dev.schultz-thomas.fr}
       # Noms de propriétés du BFF, inchangés tant que la phase 4 ne l'a pas restructuré
       # (il devra alors distinguer le cœur du connecteur Discord).
-      BOT_BASE_URL: http://connector-discord:8080
+      BOT_BASE_URL: http://dev-connector-discord:8080
       BOT_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       TZ: Europe/Paris
     depends_on:
-      schub-mongo:
+      dev-schub-mongo:
         condition: service_healthy
-      connector-discord:
+      dev-connector-discord:
         condition: service_started
     ports:
-      - "18082:8080"
+      - "127.0.0.1:18082:8080"
     networks:
+      - schub-dev
+
+  dev-schub-front:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - /home/pisel/projet/Schub/schub-front-servers:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
+    environment:
+      # Cible du proxy /api du serveur Vite (voir vite.config.js). Sans elle, les appels
+      # du navigateur tombent sur le serveur de dev, qui ne sait pas les router.
+      API_PROXY_TARGET: http://dev-schub-bff:8080
+      TZ: Europe/Paris
+    depends_on:
+      - dev-schub-bff
+    ports:
+      - "18090:80"
+    networks:
+      # Seul service à joindre l'overlay partagé : le tunnel Cloudflare y vit.
+      - schub-dev
       - schub
 
 volumes:
   mongo_data_dev:
+
 networks:
+  schub-dev:
+    driver: bridge
   schub:
     external: true

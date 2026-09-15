@@ -15,7 +15,7 @@ tasks:
       - "{{.COMPOSE_CMD}} up --build -d --force-recreate"
 
   dev:restart:
-    desc: "Redémarre un service sans rebuild. Usage: task dev:restart -- connector-discord"
+    desc: "Redémarre un service sans rebuild. Usage: task dev:restart -- dev-connector-discord"
     cmds:
       - "{{.COMPOSE_CMD}} restart {{.CLI_ARGS}}"
 
@@ -25,7 +25,7 @@ tasks:
       - "{{.COMPOSE_CMD}} down"
 
   logs:
-    desc: "Affiche les logs. Usage: task logs (tous) ou task logs -- connector-discord"
+    desc: "Affiche les logs. Usage: task logs (tous) ou task logs -- dev-connector-discord"
     cmds:
       - "{{.COMPOSE_CMD}} logs -f {{.CLI_ARGS}}"
 
@@ -45,7 +45,7 @@ tasks:
           -e MONGO_BOT_PASSWORD="$MONGO_BOT_PASSWORD" \
           -e MONGO_SERVERS_PASSWORD="$MONGO_SERVERS_PASSWORD" \
           -e MONGO_RIOT_PASSWORD="$MONGO_RIOT_PASSWORD" \
-          schub-mongo \
+          dev-schub-mongo \
           mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
           --quiet --eval "$(cat ../../../scripts/mongo-init-databases.js)"
 
