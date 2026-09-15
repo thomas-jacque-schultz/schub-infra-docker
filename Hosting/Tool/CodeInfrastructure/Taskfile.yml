@@ -15,7 +15,7 @@ tasks:
       - "{{.COMPOSE_CMD}} up --build -d --force-recreate"
 
   dev:restart:
-    desc: "Redémarre un service sans rebuild. Usage: task dev:restart -- bot-back"
+    desc: "Redémarre un service sans rebuild. Usage: task dev:restart -- connector-discord"
     cmds:
       - "{{.COMPOSE_CMD}} restart {{.CLI_ARGS}}"
 
@@ -25,7 +25,7 @@ tasks:
       - "{{.COMPOSE_CMD}} down"
 
   logs:
-    desc: "Affiche les logs. Usage: task logs (tous) ou task logs -- bot-back"
+    desc: "Affiche les logs. Usage: task logs (tous) ou task logs -- connector-discord"
     cmds:
       - "{{.COMPOSE_CMD}} logs -f {{.CLI_ARGS}}"
 
@@ -33,3 +33,25 @@ tasks:
     desc: "Arrête tout, supprime volumes + réseaux orphelins de cet environnement de dev"
     cmds:
       - "{{.COMPOSE_CMD}} down -v --remove-orphans"
+
+  db:init:
+    desc: "Crée un utilisateur Mongo par service sur sa base logique (idempotent)"
+    cmds:
+      - |
+        set -a; . .env.dev.example; set +a
+        # Passe par compose plutôt que par un nom de conteneur en dur : celui-ci
+        # dépend du nom du projet ET du service, et a déjà changé au renommage du 13-09.
+        {{.COMPOSE_CMD}} exec -T \
+          -e MONGO_BOT_PASSWORD="$MONGO_BOT_PASSWORD" \
+          -e MONGO_SERVERS_PASSWORD="$MONGO_SERVERS_PASSWORD" \
+          -e MONGO_RIOT_PASSWORD="$MONGO_RIOT_PASSWORD" \
+          schub-mongo \
+          mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
+          --quiet --eval "$(cat ../../../scripts/mongo-init-databases.js)"
+
+  bootstrap:
+    desc: "Environnement de dev complet : conteneurs puis bases Mongo"
+    cmds:
+      - task: dev
+      - sleep 15
+      - task: db:init

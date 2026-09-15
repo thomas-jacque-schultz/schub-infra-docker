@@ -1,0 +1,44 @@
+# Règles de redirection PERMANENTES sur le routeur.
+#
+# À copier sur le nœud dynamis en /mnt/volume/PortForwarding/port-forwarding.yml
+# (monté dans bot-back sur /etc/schub/port-forwarding.yml).
+#
+# Ce fichier ne couvre que ce qui doit rester ouvert en permanence. Les ports des
+# serveurs de jeu ne sont PAS déclarés ici : ils sont portés par la fiche serveur
+# (front ou commande Discord) et ouverts/fermés automatiquement avec la stack.
+#
+# Relu au redémarrage de bot-back :
+#   docker service update --force CodeInfrastructure_bot-back
+#
+# Toute règle listée ici est créée puis maintenue OUVERTE. Retirer une règle du
+# fichier la ferme (ou la supprime si port-forwarding.prune-orphans=true).
+# Les redirections créées à la main dans Freebox OS ne sont jamais touchées :
+# le bot ne modifie que celles dont le libellé commence par "[schub]".
+
+port-forwarding:
+  static-rules: []
+
+  # Exemple — décommenter et adapter :
+  #
+  # static-rules:
+  #   - name: wireguard
+  #     proto: udp
+  #     wan-port-start: 51820
+  #     lan-port: 51820
+  #     lan-ip: 192.168.1.200
+  #     enabled: true
+  #
+  #   # Plage de ports : wan-port-end est facultatif (absent = port unique).
+  #   - name: teamspeak-voice
+  #     proto: udp
+  #     wan-port-start: 9987
+  #     wan-port-end: 9989
+  #     lan-port: 9987
+  #     enabled: true
+  #
+  #   # enabled: false garde la règle documentée ici tout en la fermant sur le routeur.
+  #   - name: teamspeak-filetransfer
+  #     proto: tcp
+  #     wan-port-start: 30033
+  #     lan-port: 30033
+  #     enabled: false
