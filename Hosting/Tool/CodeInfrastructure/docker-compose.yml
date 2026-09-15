@@ -85,7 +85,7 @@ services:
       MONGO_DB: discordbot
       DISCORD_ADMIN_ID: 245281978054737920
       DISCORD_ADMIN_USERNAME: admin
-      PORTAINER_VIRTUAL_HOST: default-value
+      CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Pilotage des redirections de ports : les ports des serveurs de jeu ne sont
       # ouverts que pendant qu'ils tournent. loki est le nœud où les stacks de jeu
@@ -103,13 +103,30 @@ services:
       - source: MONGO_ROOT_USERNAME
       - source: MONGO_ROOT_PASSWORD
       - source: DISCORD_TOKEN
-      - source: PORTAINER_TOKEN
     depends_on:
       - schub-mongo
     volumes:
       - port_forwarding_config:/etc/schub
     ports:
       - "8081:8080"
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
+
+  connector-portainer:
+    image: thomasschultzschub/schub-connector-portainer:v1.2.4
+    networks:
+      - schub
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
+      PORTAINER_VIRTUAL_HOST: http://admin-portainer:9000
+      TZ: Europe/Paris
+    secrets:
+      - source: PORTAINER_TOKEN
     logging: *default-logging
     deploy:
       restart_policy:

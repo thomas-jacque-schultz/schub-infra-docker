@@ -52,9 +52,8 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
       DISCORD_ADMIN_USERNAME: ${DISCORD_ADMIN_USERNAME}
-      PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
-      PORTAINER_TOKEN: ${PORTAINER_TOKEN}
       CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
+      CONNECTOR_PORTAINER_URL: http://dev-connector-portainer:8080
       # Activé en dev parce que le connecteur parle au stub, jamais à la vraie box.
       # Le dry-run reste à true : on veut voir ce qui serait fait avant de le faire.
       PORT_FORWARDING_ENABLED: "true"
@@ -67,9 +66,6 @@ services:
       - "127.0.0.1:18081:8080"
     networks:
       - schub-dev
-      # Aussi sur l'overlay partagé, uniquement pour joindre `admin-portainer` qui y vit
-      # (plan §9). Le préfixe `dev-` du service évite toute collision avec la prod.
-      - schub
 
   # Fausse Freebox. Il n'existe qu'UNE vraie box, partagée par le dev et la prod :
   # sans ce stub, un dev sorti du dry-run écrirait sur le routeur réel et fermerait les
@@ -139,11 +135,17 @@ services:
       - /home/pisel/projet/Schub/schub-connector-portainer/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      # Le jeton d'API suit le service : depuis la phase 2, lui seul parle à Portainer.
+      PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
+      PORTAINER_TOKEN: ${PORTAINER_TOKEN}
       TZ: Europe/Paris
     ports:
       - "127.0.0.1:18086:8080"
     networks:
       - schub-dev
+      # Aussi sur l'overlay partagé : `admin-portainer` y vit (plan §9). C'est désormais
+      # le seul service de dev qui en a besoin.
+      - schub
 
   dev-connector-riot:
     build:

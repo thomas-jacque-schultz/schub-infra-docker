@@ -20,7 +20,7 @@ contrat passe par une modification ici**, visible en revue, avant d'être implé
 | Fichier | Décrit | État |
 |---|---|---|
 | `connector-freebox.openapi.yaml` | redirections de ports du routeur | écrit (phase 1) |
-| `connector-portainer.openapi.yaml` | stacks, sonde d'état datée | à écrire (phase 2) |
+| `connector-portainer.openapi.yaml` | stacks, sonde d'état datée | écrit (phase 2) |
 | `connector-discord.openapi.yaml` | notifications poussées vers Discord | à écrire (phase 3) |
 | `core.openapi.yaml` | GameServer exposés au BFF et aux connecteurs | à écrire (phase 3) |
 
