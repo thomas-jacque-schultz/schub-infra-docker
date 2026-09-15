@@ -67,6 +67,9 @@ services:
       - "127.0.0.1:18081:8080"
     networks:
       - schub-dev
+      # Aussi sur l'overlay partagé, uniquement pour joindre `admin-portainer` qui y vit
+      # (plan §9). Le préfixe `dev-` du service évite toute collision avec la prod.
+      - schub
 
   # Fausse Freebox. Il n'existe qu'UNE vraie box, partagée par le dev et la prod :
   # sans ce stub, un dev sorti du dry-run écrirait sur le routeur réel et fermerait les
