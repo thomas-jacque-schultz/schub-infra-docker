@@ -64,6 +64,22 @@ services:
     networks:
       - schub-dev
 
+  # Fausse Freebox. Il n'existe qu'UNE vraie box, partagée par le dev et la prod :
+  # sans ce stub, un dev sorti du dry-run écrirait sur le routeur réel et fermerait les
+  # ports de production. Aucune séparation de base de données ne protège de ça.
+  dev-freebox-stub:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - /home/pisel/projet/schub-infra-docker/Hosting/Tool/CodeInfrastructure/freebox-stub:/app:ro
+    command: node server.js
+    environment:
+      TZ: Europe/Paris
+    ports:
+      - "127.0.0.1:18099:8080"
+    networks:
+      - schub-dev
+
   dev-connector-freebox:
     build:
       context: ../../../../Schub/schub-connector-freebox
@@ -72,10 +88,14 @@ services:
       - /home/pisel/projet/Schub/schub-connector-freebox/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
-      # Jeton d'appairage. Vide = connecteur en veille : il démarre, répond
-      # /router/status et n'émet aucune requête vers la box.
-      FREEBOX_APP_TOKEN: ${FREEBOX_APP_TOKEN:-}
+      # En dev on parle au stub, JAMAIS à la vraie box.
+      FREEBOX_BASE_URL: ${FREEBOX_BASE_URL:-http://dev-freebox-stub:8080}
+      # Le stub ne vérifie pas le jeton ; il doit juste être non vide, sinon le
+      # connecteur reste en veille et n'émet aucune requête.
+      FREEBOX_APP_TOKEN: ${FREEBOX_APP_TOKEN:-stub-token}
       TZ: Europe/Paris
+    depends_on:
+      - dev-freebox-stub
     ports:
       - "127.0.0.1:18084:8080"
     networks:
