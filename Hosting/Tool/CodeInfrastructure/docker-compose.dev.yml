@@ -52,16 +52,12 @@ services:
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
       DISCORD_ADMIN_USERNAME: ${DISCORD_ADMIN_USERNAME}
-      CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
-      CONNECTOR_PORTAINER_URL: http://dev-connector-portainer:8080
-      # Activé en dev parce que le connecteur parle au stub, jamais à la vraie box.
-      # Le dry-run reste à true : on veut voir ce qui serait fait avant de le faire.
-      PORT_FORWARDING_ENABLED: "true"
-      PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
+      # Depuis la phase 3, le connecteur ne connaît plus que le cœur.
+      CORE_URL: http://dev-schub-core:8080
       TZ: Europe/Paris
     depends_on:
       - dev-schub-mongo
-      - dev-connector-freebox
+      - dev-schub-core
     ports:
       - "127.0.0.1:18081:8080"
     networks:
@@ -121,6 +117,13 @@ services:
       MONGO_DB: servers
       MONGO_USERNAME: servers
       MONGO_PASSWORD: ${MONGO_SERVERS_PASSWORD}
+      # Le cœur pilote les connecteurs ; il ne connaît ni Portainer ni la box.
+      CONNECTOR_PORTAINER_URL: http://dev-connector-portainer:8080
+      CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
+      CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
+      # Activé en dev parce que le connecteur Freebox parle au stub, jamais à la vraie box.
+      PORT_FORWARDING_ENABLED: "true"
+      PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
     ports:
       - "127.0.0.1:18083:8080"
