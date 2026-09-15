@@ -16,6 +16,8 @@ x-logging:
   driver: "json-file"
   options:
     tag: "{{.Name}}"
+    max-size: "50m"
+    max-file: "3"
 
 # Container Configuration
 services:
