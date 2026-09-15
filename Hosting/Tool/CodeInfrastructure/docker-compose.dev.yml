@@ -93,7 +93,11 @@ services:
       AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-3600}
       AUTH_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
       AUTH_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me}
-      AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,https://dev.schultz-thomas.fr}
+      # Le proxy /api de Vite relaie l'en-tête Origin du navigateur tel quel : le BFF voit
+      # donc une requête « cross-origin » et applique cette liste. Toute origine par
+      # laquelle le front est réellement ouvert doit y figurer — http ET https, sinon la
+      # page s'affiche mais la connexion part en 403 « Invalid CORS request ».
+      AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,http://dev.schultz-thomas.fr,https://dev.schultz-thomas.fr,http://192.168.1.200:18090}
       # Noms de propriétés du BFF, inchangés tant que la phase 4 ne l'a pas restructuré
       # (il devra alors distinguer le cœur du connecteur Discord).
       BOT_BASE_URL: http://dev-connector-discord:8080
