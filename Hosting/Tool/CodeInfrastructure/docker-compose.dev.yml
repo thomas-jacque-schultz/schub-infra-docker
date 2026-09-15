@@ -55,6 +55,10 @@ services:
       PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
       PORTAINER_TOKEN: ${PORTAINER_TOKEN}
       CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
+      # Activé en dev parce que le connecteur parle au stub, jamais à la vraie box.
+      # Le dry-run reste à true : on veut voir ce qui serait fait avant de le faire.
+      PORT_FORWARDING_ENABLED: "true"
+      PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
     depends_on:
       - dev-schub-mongo
@@ -98,6 +102,57 @@ services:
       - dev-freebox-stub
     ports:
       - "127.0.0.1:18084:8080"
+    networks:
+      - schub-dev
+
+  # Squelettes des phases à venir : ils démarrent, répondent /actuator/health et rien de
+  # plus. Déclarés dès maintenant pour que l'environnement de dev ait la forme de
+  # l'architecture cible, et qu'une phase commence sur une stack qui tourne déjà.
+  dev-schub-core:
+    build:
+      context: ../../../../Schub/schub-core
+      dockerfile: Dockerfile.dev
+    volumes:
+      - /home/pisel/projet/Schub/schub-core/src:/usr/src/app/src
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      # Utilisateur propre à sa base, créé par `task db:init`. Le cœur détient la
+      # collection `servers` (plan §3) et n'a pas à connaître les identifiants root.
+      MONGO_HOST: dev-schub-mongo
+      MONGO_DB: servers
+      MONGO_USERNAME: servers
+      MONGO_PASSWORD: ${MONGO_SERVERS_PASSWORD}
+      TZ: Europe/Paris
+    ports:
+      - "127.0.0.1:18083:8080"
+    networks:
+      - schub-dev
+
+  dev-connector-portainer:
+    build:
+      context: ../../../../Schub/schub-connector-portainer
+      dockerfile: Dockerfile.dev
+    volumes:
+      - /home/pisel/projet/Schub/schub-connector-portainer/src:/usr/src/app/src
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      TZ: Europe/Paris
+    ports:
+      - "127.0.0.1:18086:8080"
+    networks:
+      - schub-dev
+
+  dev-connector-riot:
+    build:
+      context: ../../../../Schub/schub-connector-riot
+      dockerfile: Dockerfile.dev
+    volumes:
+      - /home/pisel/projet/Schub/schub-connector-riot/src:/usr/src/app/src
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      TZ: Europe/Paris
+    ports:
+      - "127.0.0.1:18085:8080"
     networks:
       - schub-dev
 
