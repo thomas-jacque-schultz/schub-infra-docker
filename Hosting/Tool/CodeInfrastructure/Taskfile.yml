@@ -100,22 +100,23 @@ tasks:
         echo "$cid"
 
   db:init:prod:
-    desc: "PROD : crée les utilisateurs Mongo. Exige MONGO_BOT_PASSWORD et MONGO_SERVERS_PASSWORD (RIOT facultatif)."
+    desc: "PROD : crée les utilisateurs Mongo. Aucun mot de passe à fournir, ils sont lus dans les secrets Swarm."
     cmds:
       - |
         set -e
-        # BOT et SERVERS sont exigés : leurs services sont déployés et ne démarreront pas sans.
-        # RIOT est facultatif — le connecteur riot n'est pas dans le compose de prod, et le
-        # script saute proprement un service dont le mot de passe est absent.
-        for v in MONGO_BOT_PASSWORD MONGO_SERVERS_PASSWORD; do
-          eval "val=\$$v"
-          [ -n "$val" ] || { echo "Error: $v absent de l'environnement." >&2; exit 1; }
-        done
-        [ -n "$MONGO_RIOT_PASSWORD" ] || echo "Note: MONGO_RIOT_PASSWORD absent, l'utilisateur riot sera sauté."
+        # Rien à exporter : le script lit /run/secrets/MONGO_{BOT,SERVERS}_PASSWORD depuis le
+        # conteneur Mongo, qui les monte. C'est LA source de vérité — la même que celle dont
+        # les services tirent leur mot de passe. Les repasser à la main rouvrirait la porte à
+        # l'écart qui a fait échouer le premier déploiement du 17-09.
         cid=$(task db:mongo:prod:id)
-        docker exec -i \
-          -e MONGO_BOT_PASSWORD -e MONGO_SERVERS_PASSWORD -e MONGO_RIOT_PASSWORD \
-          "$cid" sh -c 'mongosh --quiet --host localhost:27017 \
+        # La lecture des secrets se fait DANS le conteneur, par le shell : `cat()` du shell
+        # mongo historique n'existe pas dans mongosh, et de toute façon les valeurs n'ont
+        # aucune raison de transiter par l'extérieur.
+        docker exec -i "$cid" sh -c '
+          for n in MONGO_BOT_PASSWORD MONGO_SERVERS_PASSWORD MONGO_RIOT_PASSWORD; do
+            [ -r "/run/secrets/$n" ] && export "$n=$(cat "/run/secrets/$n")"
+          done
+          mongosh --quiet --host localhost:27017 \
             --username "$(cat /run/secrets/MONGO_ROOT_USERNAME)" \
             --password "$(cat /run/secrets/MONGO_ROOT_PASSWORD)" \
             --authenticationDatabase admin --eval "$1"' _ "$(cat mongo-init-databases.js)"

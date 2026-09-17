@@ -70,6 +70,13 @@ services:
     secrets:
       - MONGO_ROOT_USERNAME
       - MONGO_ROOT_PASSWORD
+      # Les mots de passe des utilisateurs de service, pour que `task db:init:prod` les lise
+      # DEPUIS LE SECRET plutôt qu'on les lui repasse à la main. Sans ça il existe deux sources
+      # de vérité — le secret que reçoit le service, et ce qu'on tape en créant l'utilisateur —
+      # et le moindre écart ne se voit qu'au démarrage suivant, en « AuthenticationFailed ».
+      # C'est ce qui a fait échouer le premier déploiement du 17-09.
+      - MONGO_BOT_PASSWORD
+      - MONGO_SERVERS_PASSWORD
     volumes:
       - mongo_data:/data/db
     healthcheck:
