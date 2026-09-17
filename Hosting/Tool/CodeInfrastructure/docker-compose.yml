@@ -86,7 +86,7 @@ services:
           - node.labels.name == dynamis
 
   connector-discord:
-    image: thomasschultzschub/schub-connector-discord:v2.0.0
+    image: thomasschultzschub/schub-connector-discord:v2.0.1
     networks:
       - schub
     environment:
@@ -135,7 +135,7 @@ services:
   # Sans le point 1, le cœur démarre sur une base vide et la réconciliation ferme les ports
   # de serveurs qui tournent.
   schub-core:
-    image: thomasschultzschub/schub-core:v2.0.0
+    image: thomasschultzschub/schub-core:v2.0.1
     networks:
       - schub
     environment:
@@ -170,7 +170,7 @@ services:
           - node.labels.name == dynamis
 
   connector-portainer:
-    image: thomasschultzschub/schub-connector-portainer:v2.0.0
+    image: thomasschultzschub/schub-connector-portainer:v2.0.1
     networks:
       - schub
     environment:
@@ -188,7 +188,7 @@ services:
           - node.labels.name == dynamis
 
   connector-freebox:
-    image: thomasschultzschub/schub-connector-freebox:v2.0.0
+    image: thomasschultzschub/schub-connector-freebox:v2.0.1
     networks:
       - schub
     environment:
@@ -208,7 +208,7 @@ services:
           - node.labels.name == dynamis
 
   schub-front:
-    image: thomasschultzschub/schub-front:v2.0.0
+    image: thomasschultzschub/schub-front:v2.0.1
     networks:
       - schub
     depends_on:
@@ -226,7 +226,7 @@ services:
           - node.labels.name == dynamis
 
   schub-bff:
-    image: thomasschultzschub/schub-bff:v2.0.0
+    image: thomasschultzschub/schub-bff:v2.0.1
     networks:
       - schub
     environment:
