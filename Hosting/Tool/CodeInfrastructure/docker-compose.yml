@@ -115,8 +115,6 @@ services:
     # jusqu'à ce que ça passe. Les services doivent tolérer d'arriver trop tôt.
     depends_on:
       - schub-mongo
-    ports:
-      - "8081:8080"
     logging: *default-logging
     deploy:
       restart_policy:
@@ -211,8 +209,18 @@ services:
     image: thomasschultzschub/schub-front:v2.0.1
     networks:
       - schub
+    # Le front parle au BFF, pas au connecteur Discord — son nginx a
+    # `proxy_pass http://schub-bff:8080/` en dur. (Et Swarm ignore depends_on de toute façon.)
     depends_on:
-      - connector-discord
+      - schub-bff
+    # SEUL service publié sur l'hôte. Le tunnel Cloudflare vit sur l'overlay `schub` et vise
+    # `http://schub-front:80` par nom de service : ce port n'existe donc que pour un accès
+    # direct depuis le LAN. Il peut disparaître si tu n'y accèdes que par schultz-thomas.fr.
+    #
+    # Les autres services ne publient RIEN, depuis le 17-09. Ils se joignent par nom sur
+    # l'overlay, et les publier revenait à exposer des API internes sur le LAN — c'est aussi
+    # ce qui a fait échouer le premier déploiement : 8081 était déjà pris par la stack
+    # Assetto Corsa, et 8082 par le BFF de ce même déploiement, à moitié monté.
     ports:
       - "8080:80"
     environment:
@@ -247,8 +255,6 @@ services:
     depends_on:
       - schub-core
       - connector-discord
-    ports:
-      - "8082:8080"
     logging: *default-logging
     deploy:
       restart_policy:
