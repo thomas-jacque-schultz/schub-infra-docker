@@ -3,20 +3,22 @@ version: "3.8"
 # Volumes
 
 volumes:
+  # Données réelles de la prod, écrites par le déploiement qui a tourné jusqu'en avril 2026.
+  # Le chemin pointait sur /mnt/volume/BotFront/Database, QUI N'EXISTE PAS : avec `o: bind`,
+  # Docker refuse de monter un chemin absent et le service ne démarrait pas. Corrigé le 17-09.
+  # Cette base est à l'ANCIEN schéma (identifier, portainerStackId) : la migration
+  # mongo-migrate-servers-to-core.js doit y passer avant le premier démarrage du cœur.
   mongo_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/volume/BotFront/Database
-  # Règles de redirection permanentes, éditées à la main (port-forwarding.yml).
-  # Relues au redémarrage de connector-discord.
-  port_forwarding_config:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/PortForwarding
+      device: /mnt/volume/MongoBot
+  # Le volume port_forwarding_config a été retiré le 17-09. Les règles permanentes vivaient
+  # dans /mnt/volume/PortForwarding/port-forwarding.yml, relu au démarrage ; depuis la phase 3
+  # elles sont en base (`static_port_rules`) et pilotées par l'API du cœur. LE FICHIER EXISTE
+  # TOUJOURS SUR LE DISQUE : son contenu doit être saisi dans `static_port_rules` avant le
+  # premier démarrage de la prod, sinon ces redirections ne seront plus tenues.
 
 # Secrets
 
@@ -29,7 +31,14 @@ secrets:
     external: true
   PORTAINER_TOKEN:
     external: true
-  # Jeton d'appairage Freebox, obtenu via scripts/freebox-pair.sh.
+  # Mot de passe de l'utilisateur `bot`, créé par mongo-init-databases.js. Remplace les
+  # identifiants root que le connecteur Discord détenait jusqu'au 17-09.
+  MONGO_BOT_PASSWORD:
+    external: true
+  # Mot de passe de l'utilisateur `servers`, celui du cœur.
+  MONGO_SERVERS_PASSWORD:
+    external: true
+  # Jeton d'appairage Freebox, obtenu via scripts/freebox-pair.sh du repo schub-connector-freebox.
   FREEBOX_APP_TOKEN:
     external: true
 
@@ -81,34 +90,77 @@ services:
     networks:
       - schub
     environment:
-      MONGO_DNS_NAME: schub-mongo:27017 # example mongodb://admin:change-me@schub-mongo:27017/discordbot?authSource=admin
+      # Utilisateur propre à sa base, créé par `mongo-init-databases.js`. Le connecteur
+      # détenait les identifiants root jusqu'au 17-09 — plus aucun service ne les a.
+      MONGO_HOST: schub-mongo
       MONGO_DB: discordbot
+      MONGO_USERNAME: bot
       DISCORD_ADMIN_ID: 245281978054737920
       DISCORD_ADMIN_USERNAME: admin
-      CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
-      # Pilotage des redirections de ports : les ports des serveurs de jeu ne sont
-      # ouverts que pendant qu'ils tournent. loki est le nœud où les stacks de jeu
-      # sont contraintes, donc la cible des redirections.
-      PORT_FORWARDING_ENABLED: "true"
-      # true au premier déploiement : le connecteur lit la box et journalise ce qu'il ferait
-      # sans rien modifier. À repasser à false une fois les logs vérifiés.
-      PORT_FORWARDING_DRY_RUN: "true"
-      PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
-      # Le connecteur Freebox détient le jeton et l'API du routeur ; ce service ne
-      # connaît plus que son adresse.
-      CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
+      # Depuis la phase 3, le connecteur ne connaît plus que le cœur : ni Portainer, ni la
+      # box, ni les redirections. Les variables correspondantes ont été retirées le 17-09,
+      # elles n'étaient plus lues par aucune ligne de code.
+      CORE_URL: http://schub-core:8080
       TZ: Europe/Paris
     secrets:
-      - source: MONGO_ROOT_USERNAME
-      - source: MONGO_ROOT_PASSWORD
+      # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
+      # via configtree, sans savoir de quel secret Swarm il vient.
+      - source: MONGO_BOT_PASSWORD
+        target: MONGO_PASSWORD
       - source: DISCORD_TOKEN
+    # ATTENTION : Docker Swarm IGNORE `depends_on`. Il ne sert qu'à un `docker compose up`
+    # local. En Swarm, l'ordre de démarrage ne s'exprime pas — c'est la `restart_policy`
+    # ci-dessous qui rattrape : le service meurt s'il ne joint pas Mongo, et Swarm le relance
+    # jusqu'à ce que ça passe. Les services doivent tolérer d'arriver trop tôt.
     depends_on:
       - schub-mongo
-    volumes:
-      - port_forwarding_config:/etc/schub
     ports:
       - "8081:8080"
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
+
+  # Le cœur : tout le domaine. Ajouté en phase 4 — il n'existait pas dans ce fichier, alors
+  # que le BFF n'a plus rien d'autre vers qui router le domaine.
+  #
+  # ATTENTION, deux préalables avant le premier démarrage :
+  #   1. `task db:migrate:legacy` contre CETTE base — elle est à l'ancien schéma (§6 bis).
+  #   2. le secret Swarm MONGO_SERVERS_PASSWORD, et l'utilisateur `servers` créé par
+  #      mongo-init-databases.js.
+  # Sans le point 1, le cœur démarre sur une base vide et la réconciliation ferme les ports
+  # de serveurs qui tournent.
+  schub-core:
+    image: thomasschultzschub/schub-core:v1.2.4
+    networks:
+      - schub
+    environment:
+      # Utilisateur propre à sa base. Le cœur n'a jamais connu les identifiants root.
+      MONGO_HOST: schub-mongo
+      MONGO_DB: servers
+      MONGO_USERNAME: servers
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
+      # Le cœur pilote les connecteurs ; il ne connaît ni Portainer ni la box.
+      CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
+      CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
+      CONNECTOR_DISCORD_URL: http://connector-discord:8080
+      # Les redirections ont suivi le domaine dans le cœur à la phase 3. loki est le nœud où
+      # les stacks de jeu sont contraintes, donc la cible des redirections.
+      PORT_FORWARDING_ENABLED: "true"
+      # true au premier déploiement : le cœur lit la box et journalise ce qu'il ferait sans
+      # rien modifier. À repasser à false une fois les logs vérifiés.
+      PORT_FORWARDING_DRY_RUN: "true"
+      PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
+      TZ: Europe/Paris
+    secrets:
+      - source: MONGO_SERVERS_PASSWORD
+        target: MONGO_PASSWORD
+    depends_on:
+      - schub-mongo
     logging: *default-logging
     deploy:
       restart_policy:
@@ -178,28 +230,23 @@ services:
     networks:
       - schub
     environment:
-      # Même Mongo que connector-discord, base séparée. MONGO_ROOT_USERNAME/PASSWORD sont
-      # des secrets Docker (fichiers) pour schub-mongo/connector-discord, pas des variables
-      # de compose — ${...} ne peut pas les lire ici. Il faut redéfinir les mêmes
-      # valeurs comme variables d'environnement Portainer (Stack -> Environment
-      # variables), en plus des secrets Docker déjà en place, pour que cette
-      # substitution fonctionne.
-      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@schub-mongo:27017/backend?authSource=admin
+      # Le BFF est SANS ÉTAT depuis la phase 4 : la dépendance Mongo a été retirée (aucun
+      # repository ne l'utilisait) et avec elle les identifiants root qu'il détenait.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
       AUTH_JWT_EXPIRATION_SECONDS: 3600
       AUTH_ADMIN_USERNAME: ${AUTH_ADMIN_USERNAME}
       AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD}
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
-      # Noms de propriétés du BFF, inchangés tant que la phase 4 ne l'a pas restructuré
-      # (il devra alors distinguer le cœur du connecteur Discord).
-      BOT_BASE_URL: http://connector-discord:8080
-      BOT_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
+      # Les deux amonts, depuis la phase 4 : le domaine au cœur, Discord au connecteur.
+      CORE_URL: http://schub-core:8080
+      CONNECTOR_DISCORD_URL: http://connector-discord:8080
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       TZ: Europe/Paris
+    # Rappel : Swarm ignore `depends_on` (cf. schub-mongo). C'est la restart_policy qui tient
+    # lieu d'ordre de démarrage.
     depends_on:
-      schub-mongo:
-        condition: service_healthy
-      connector-discord:
-        condition: service_started
+      - schub-core
+      - connector-discord
     ports:
       - "8082:8080"
     logging: *default-logging

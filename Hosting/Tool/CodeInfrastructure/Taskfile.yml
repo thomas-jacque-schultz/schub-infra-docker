@@ -47,7 +47,24 @@ tasks:
           -e MONGO_RIOT_PASSWORD="$MONGO_RIOT_PASSWORD" \
           dev-schub-mongo \
           mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
-          --quiet --eval "$(cat ../../../scripts/mongo-init-databases.js)"
+          --quiet --eval "$(cat mongo-init-databases.js)"
+
+  db:migrate:legacy:
+    desc: "ONE-SHOT : déplace discordbot.servers -> servers.servers (ancien schéma). Voir la description."
+    # Le SEUL script de migration lancé à la main du système. Il enjambe deux bases, ce que
+    # le cœur n'a pas le droit de faire : son utilisateur Mongo n'a de droits que sur `servers`.
+    # Lui donner ce droit pour un besoin unique et définitif coûterait le cloisonnement.
+    #
+    # Tout le reste du schéma appartient à Mongock, dans schub-core, paquet `core.migration` :
+    # appliqué au démarrage, tracé en base, jamais rejoué. Rien à lancer.
+    #
+    # Rejouable sans risque (repère par _id, ne supprime jamais la source).
+    cmds:
+      - |
+        set -a; . .env.dev.example; set +a
+        {{.COMPOSE_CMD}} exec -T dev-schub-mongo \
+          mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
+          --quiet --eval "$(cat mongo-migrate-servers-to-core.js)"
 
   bootstrap:
     desc: "Environnement de dev complet : conteneurs puis bases Mongo"

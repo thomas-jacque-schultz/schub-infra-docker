@@ -44,10 +44,12 @@ services:
       # ne connaît que /home/pisel/... — voir Admin/Manager/docker-compose.yml.
       - /home/pisel/projet/Schub/schub-connector-discord/src:/usr/src/app/src
     environment:
-      MONGO_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
-      MONGO_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      # Utilisateur propre à sa base, créé par `task db:init`. Le connecteur détenait les
+      # identifiants root jusqu'au 17-09 — il ne les a plus (cf. plan §3, cloisonnement).
       MONGO_HOST: dev-schub-mongo
       MONGO_DB: ${MONGO_DB}
+      MONGO_USERNAME: bot
+      MONGO_PASSWORD: ${MONGO_BOT_PASSWORD}
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
@@ -56,8 +58,13 @@ services:
       CORE_URL: http://dev-schub-core:8080
       TZ: Europe/Paris
     depends_on:
-      - dev-schub-mongo
-      - dev-schub-core
+      dev-schub-mongo:
+        condition: service_healthy
+      # `service_healthy` et non `service_started` : le cœur applique les migrations Mongock
+      # au démarrage et ne devient « prêt » qu'après. Sans ça, le premier pull tomberait sur
+      # un schéma en cours de transformation.
+      dev-schub-core:
+        condition: service_healthy
     ports:
       - "127.0.0.1:18081:8080"
     networks:
@@ -125,6 +132,18 @@ services:
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
+    depends_on:
+      dev-schub-mongo:
+        condition: service_healthy
+    # La sonde de disponibilité ne passe au vert qu'une fois le contexte Spring démarré,
+    # donc APRÈS les migrations Mongock. C'est elle qui donne son sens au `service_healthy`
+    # des autres services : « le schéma est à jour », pas seulement « le port répond ».
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 40s
     ports:
       - "127.0.0.1:18083:8080"
     networks:
@@ -171,7 +190,8 @@ services:
     volumes:
       - /home/pisel/projet/Schub/schub-back-bff/src:/usr/src/app/src
     environment:
-      SPRING_DATA_MONGODB_URI: mongodb://${MONGO_ROOT_USERNAME}:${MONGO_ROOT_PASSWORD}@dev-schub-mongo:27017/${SCHUB_MONGO_DB}?authSource=admin
+      # Le BFF est SANS ÉTAT depuis la phase 4 : il n'a plus de dépendance Mongo (elle ne
+      # servait à rien) et donc plus d'identifiants root. Il ne connaît que ses deux amonts.
       AUTH_JWT_SECRET: ${APP_JWT_SECRET:-change-this-jwt-secret-key-with-at-least-32-characters}
       AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-3600}
       AUTH_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
@@ -181,13 +201,15 @@ services:
       # laquelle le front est réellement ouvert doit y figurer — http ET https, sinon la
       # page s'affiche mais la connexion part en 403 « Invalid CORS request ».
       AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,http://dev.schultz-thomas.fr,https://dev.schultz-thomas.fr,http://192.168.1.200:18090}
-      # Noms de propriétés du BFF, inchangés tant que la phase 4 ne l'a pas restructuré
-      # (il devra alors distinguer le cœur du connecteur Discord).
-      BOT_BASE_URL: http://dev-connector-discord:8080
-      BOT_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      # Les deux amonts, depuis la phase 4. Le domaine va au cœur, Discord au connecteur.
+      CORE_URL: http://dev-schub-core:8080
+      CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       TZ: Europe/Paris
     depends_on:
-      dev-schub-mongo:
+      # Le cœur SAIN : sa sonde ne passe au vert qu'après les migrations Mongock. Le BFF ne
+      # doit pas servir de fiches lues sur un schéma en cours de transformation.
+      dev-schub-core:
         condition: service_healthy
       dev-connector-discord:
         condition: service_started

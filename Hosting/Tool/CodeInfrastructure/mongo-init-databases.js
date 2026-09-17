@@ -9,9 +9,12 @@
 // Une variable absente fait sauter le service correspondant, sans échouer.
 
 const services = [
-  { database: "bot",     user: "bot",     passwordEnv: "MONGO_BOT_PASSWORD" },
-  { database: "servers", user: "servers", passwordEnv: "MONGO_SERVERS_PASSWORD" },
-  { database: "riot",    user: "riot",    passwordEnv: "MONGO_RIOT_PASSWORD" },
+  // La base du connecteur Discord garde son nom historique `discordbot` : c'est là que vivent
+  // réellement ses salons et ses utilisateurs. La renommer serait une migration de données,
+  // pas un renommage — reporté en phase 6. L'utilisateur, lui, n'a de droits que sur elle.
+  { database: "discordbot", user: "bot",     passwordEnv: "MONGO_BOT_PASSWORD" },
+  { database: "servers",    user: "servers", passwordEnv: "MONGO_SERVERS_PASSWORD" },
+  { database: "riot",       user: "riot",    passwordEnv: "MONGO_RIOT_PASSWORD" },
 ];
 
 let created = 0, updated = 0, skipped = 0;
