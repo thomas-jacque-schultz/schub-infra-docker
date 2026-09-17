@@ -66,6 +66,67 @@ tasks:
           mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
           --quiet --eval "$(cat mongo-migrate-servers-to-core.js)"
 
+  # --- PROD ------------------------------------------------------------------
+  #
+  # Les deux tâches ci-dessus visent la stack de DEV, via docker compose. La prod est une
+  # stack Swarm : ni compose, ni le même nom de conteneur. D'où ces deux jumelles.
+  #
+  # L'ORDRE, et pourquoi il n'y a pas d'impasse : `schub-mongo` n'a aucun depends_on, il
+  # démarre seul. Les autres services planteront en boucle tant que les utilisateurs et les
+  # données ne sont pas là — c'est sans gravité, `restart_policy: any` les relance et ils
+  # repartent d'eux-mêmes ensuite.
+  #
+  #   1. déployer la stack           (mongo monte, le reste boucle)
+  #   2. task db:init:prod           (crée les utilisateurs)
+  #   3. task db:migrate:prod        (déplace les données de l'ancien schéma)
+  #   4. les services se rattrapent tout seuls au redémarrage suivant
+  #
+  # Les identifiants root ne sortent jamais du conteneur : ils sont lus dans /run/secrets/,
+  # là où Swarm les monte.
+
+  db:mongo:prod:id:
+    desc: "Affiche l'identifiant du conteneur Mongo de la stack Swarm"
+    silent: true
+    cmds:
+      - |
+        # Un conteneur Swarm s'appelle <stack>_schub-mongo.<slot>.<id> ; celui du dev est
+        # schub-dev-dev-schub-mongo-1. Le filtre sur "_schub-mongo." ne peut donc pas attraper
+        # le dev par mégarde — ce serait jouer une migration de prod sur la base de dev.
+        cid=$(docker ps -q --filter "name=_schub-mongo\.")
+        if [ -z "$cid" ]; then
+          echo "Error: aucun conteneur Mongo de la stack Swarm trouvé. La stack est-elle déployée ?" >&2
+          exit 1
+        fi
+        echo "$cid"
+
+  db:init:prod:
+    desc: "PROD : crée les utilisateurs Mongo. Exige MONGO_{BOT,SERVERS,RIOT}_PASSWORD dans l'environnement."
+    cmds:
+      - |
+        set -e
+        for v in MONGO_BOT_PASSWORD MONGO_SERVERS_PASSWORD MONGO_RIOT_PASSWORD; do
+          eval "val=\$$v"
+          [ -n "$val" ] || { echo "Error: $v absent de l'environnement." >&2; exit 1; }
+        done
+        cid=$(task db:mongo:prod:id)
+        docker exec -i \
+          -e MONGO_BOT_PASSWORD -e MONGO_SERVERS_PASSWORD -e MONGO_RIOT_PASSWORD \
+          "$cid" sh -c 'mongosh --quiet --host localhost:27017 \
+            --username "$(cat /run/secrets/MONGO_ROOT_USERNAME)" \
+            --password "$(cat /run/secrets/MONGO_ROOT_PASSWORD)" \
+            --authenticationDatabase admin --eval "$1"' _ "$(cat mongo-init-databases.js)"
+
+  db:migrate:prod:
+    desc: "PROD, ONE-SHOT : déplace discordbot.servers -> servers.servers. À jouer AVANT le premier démarrage du cœur."
+    cmds:
+      - |
+        set -e
+        cid=$(task db:mongo:prod:id)
+        docker exec -i "$cid" sh -c 'mongosh --quiet --host localhost:27017 \
+          --username "$(cat /run/secrets/MONGO_ROOT_USERNAME)" \
+          --password "$(cat /run/secrets/MONGO_ROOT_PASSWORD)" \
+          --authenticationDatabase admin --eval "$1"' _ "$(cat mongo-migrate-servers-to-core.js)"
+
   bootstrap:
     desc: "Environnement de dev complet : conteneurs puis bases Mongo"
     cmds:
