@@ -100,14 +100,18 @@ tasks:
         echo "$cid"
 
   db:init:prod:
-    desc: "PROD : crée les utilisateurs Mongo. Exige MONGO_{BOT,SERVERS,RIOT}_PASSWORD dans l'environnement."
+    desc: "PROD : crée les utilisateurs Mongo. Exige MONGO_BOT_PASSWORD et MONGO_SERVERS_PASSWORD (RIOT facultatif)."
     cmds:
       - |
         set -e
-        for v in MONGO_BOT_PASSWORD MONGO_SERVERS_PASSWORD MONGO_RIOT_PASSWORD; do
+        # BOT et SERVERS sont exigés : leurs services sont déployés et ne démarreront pas sans.
+        # RIOT est facultatif — le connecteur riot n'est pas dans le compose de prod, et le
+        # script saute proprement un service dont le mot de passe est absent.
+        for v in MONGO_BOT_PASSWORD MONGO_SERVERS_PASSWORD; do
           eval "val=\$$v"
           [ -n "$val" ] || { echo "Error: $v absent de l'environnement." >&2; exit 1; }
         done
+        [ -n "$MONGO_RIOT_PASSWORD" ] || echo "Note: MONGO_RIOT_PASSWORD absent, l'utilisateur riot sera sauté."
         cid=$(task db:mongo:prod:id)
         docker exec -i \
           -e MONGO_BOT_PASSWORD -e MONGO_SERVERS_PASSWORD -e MONGO_RIOT_PASSWORD \
