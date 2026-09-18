@@ -38,6 +38,15 @@ secrets:
   # Mot de passe de l'utilisateur `servers`, celui du cœur.
   MONGO_SERVERS_PASSWORD:
     external: true
+  # Mot de passe de l'utilisateur `riot`, celui du connecteur Riot. Il manquait ici alors que
+  # `mongo-init-databases.js` le lit pour créer l'utilisateur : sans lui, `task db:init:prod`
+  # ne créait pas le compte `riot` et le connecteur n'aurait pas pu se connecter. Ajouté le 18-09.
+  MONGO_RIOT_PASSWORD:
+    external: true
+  # Clé de l'API Riot. Une clé de développement expire toutes les 24 h : la prod exige une clé
+  # de production, demandée à Riot (lot D.1).
+  RIOT_API_KEY:
+    external: true
   # Jeton d'appairage Freebox, obtenu via scripts/freebox-pair.sh du repo schub-connector-freebox.
   FREEBOX_APP_TOKEN:
     external: true
@@ -77,6 +86,7 @@ services:
       # C'est ce qui a fait échouer le premier déploiement du 17-09.
       - MONGO_BOT_PASSWORD
       - MONGO_SERVERS_PASSWORD
+      - MONGO_RIOT_PASSWORD
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -102,8 +112,15 @@ services:
       MONGO_HOST: schub-mongo
       MONGO_DB: discordbot
       MONGO_USERNAME: bot
-      DISCORD_ADMIN_ID: 245281978054737920
-      DISCORD_ADMIN_USERNAME: admin
+      # Le compte Discord semé en OWNER. La prod portait 245281978054737920 / `admin`, qui
+      # n'est PAS le compte de l'utilisateur — le dev, lui, a toujours eu le bon. Au premier
+      # déploiement, l'OWNER aurait été un compte tiers ; avec le SSO, ce compte aurait tout
+      # obtenu. Corrigé le 18-09.
+      # ⚠️ À RETIRER À LA FUSION de schub-connector-discord#36 — pas avant : sur `develop`,
+      # `UserRepositorySeeding` lit encore `discord.admin.id` sans valeur par défaut. Après la
+      # fusion, plus aucune ligne ne les lit, l'identité ayant migré vers le cœur.
+      DISCORD_ADMIN_ID: 227883780512153610
+      DISCORD_ADMIN_USERNAME: pisel
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Depuis la phase 3, le connecteur ne connaît plus que le cœur : ni Portainer, ni la
       # box, ni les redirections. Les variables correspondantes ont été retirées le 17-09,
@@ -149,6 +166,11 @@ services:
       MONGO_DB: servers
       MONGO_USERNAME: servers
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
+      # Depuis le lot A.1, c'est LE CŒUR qui détient l'identité et sème le compte OWNER —
+      # à chaque démarrage, pas seulement à la première migration : c'est le garde-fou qui
+      # rend impossible de se verrouiller dehors en changeant les rôles.
+      DISCORD_ADMIN_ID: 227883780512153610
+      DISCORD_ADMIN_USERNAME: pisel
       # Le cœur pilote les connecteurs ; il ne connaît ni Portainer ni la box.
       CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
       CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
@@ -184,6 +206,40 @@ services:
       TZ: Europe/Paris
     secrets:
       - source: PORTAINER_TOKEN
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
+
+  # Connecteur Riot — lot D.2. À la différence des connecteurs Portainer et Freebox, il POSSÈDE
+  # une base : il porte le cache des parties. Une partie terminée est immuable, donc collectée
+  # une seule fois et jamais redemandée — c'est une exigence d'architecture, pas une
+  # optimisation, et c'est ce qui rend le quota Riot presque théorique après le premier
+  # remplissage.
+  connector-riot:
+    # ⚠️ Tag à bumper vers la release qui contient le lot D.2 : l'image v2.0.1 ne contient que
+    # le squelette, sans un seul appel à l'API Riot.
+    image: thomasschultzschub/schub-connector-riot:v2.0.1
+    networks:
+      - schub
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
+      MONGO_HOST: schub-mongo
+      MONGO_DB: riot
+      MONGO_USERNAME: riot
+      TZ: Europe/Paris
+    secrets:
+      # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
+      # par configtree, sans savoir de quel secret Swarm il vient.
+      - source: MONGO_RIOT_PASSWORD
+        target: MONGO_PASSWORD
+      - source: RIOT_API_KEY
+    # Rappel : Swarm ignore `depends_on`. C'est la restart_policy qui tient lieu d'ordre.
+    depends_on:
+      - schub-mongo
     logging: *default-logging
     deploy:
       restart_policy:
@@ -248,7 +304,15 @@ services:
       # Le BFF est SANS ÉTAT depuis la phase 4 : la dépendance Mongo a été retirée (aucun
       # repository ne l'utilisait) et avec elle les identifiants root qu'il détenait.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
-      AUTH_JWT_EXPIRATION_SECONDS: 3600
+      # 900 s = 15 min, décision du 18-09. Le BFF réémet le jeton à chaque requête à laquelle
+      # il reste moins de la moitié de sa durée de vie : un utilisateur actif ne se reconnecte
+      # jamais, et un retrait de droit prend effet en 15 min au pire. La valeur de 3600 qui
+      # était ici ANNULAIT silencieusement cette décision — le code l'applique, le réglage
+      # l'écrasait. Arrive avec schub-back-bff#8.
+      AUTH_JWT_EXPIRATION_SECONDS: 900
+      # Permissions de l'OWNER à la connexion par mot de passe, qui reste la porte de service
+      # jusqu'au lot A.6 (où elle disparaît entièrement).
+      DISCORD_ADMIN_ID: 227883780512153610
       AUTH_ADMIN_USERNAME: ${AUTH_ADMIN_USERNAME}
       AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD}
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
