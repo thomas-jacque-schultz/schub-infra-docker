@@ -229,6 +229,22 @@ services:
       # laquelle le front est réellement ouvert doit y figurer — http ET https, sinon la
       # page s'affiche mais la connexion part en 403 « Invalid CORS request ».
       AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,http://dev.schultz-thomas.fr,https://dev.schultz-thomas.fr,http://192.168.1.200:18090}
+      # --- Connexion Discord, lot A.3 ---
+      # Le client id n'est pas un secret : il est public par conception, Discord l'expose dans
+      # l'URL d'autorisation. Le client secret, lui, ne vit que dans .env.dev ici, et dans un
+      # secret Swarm en prod.
+      DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID}
+      DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET}
+      # Doit correspondre AU CARACTÈRE PRÈS à ce qui est déclaré dans le portail développeur
+      # Discord, préfixe /api de nginx compris. Discord refuse la redirection à la moindre
+      # différence, y compris une barre oblique finale.
+      DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-http://localhost:18090/api/auth/discord/callback}
+      # ⚠️ false EN DEV, et ce n'est pas un détail. Le front de dev s'ouvre aussi sur
+      # http://192.168.1.200:18090 et http://dev.schultz-thomas.fr — des origines en HTTP clair
+      # et NON localhost. Un cookie marqué Secure y est SILENCIEUSEMENT ignoré par le
+      # navigateur : la connexion Discord se déroulerait sans erreur, la redirection aurait
+      # lieu, et tu resterais déconnecté sans une ligne dans les journaux pour l'expliquer.
+      AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
       # Les deux amonts, depuis la phase 4. Le domaine va au cœur, Discord au connecteur.
       CORE_URL: http://dev-schub-core:8080
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
