@@ -52,12 +52,8 @@ services:
       MONGO_PASSWORD: ${MONGO_BOT_PASSWORD}
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
-      # ⚠️ À RETIRER À LA FUSION de schub-connector-discord#36 — pas avant. Sur `develop`,
-      # `UserRepositorySeeding` lit encore `discord.admin.id` sans valeur par défaut : les
-      # supprimer maintenant empêcherait le contexte Spring de démarrer. Après la fusion,
-      # plus aucune ligne ne les lit, l'identité ayant migré vers le cœur.
-      DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
-      DISCORD_ADMIN_USERNAME: ${DISCORD_ADMIN_USERNAME}
+      # DISCORD_ADMIN_ID et DISCORD_ADMIN_USERNAME ont été retirées le 18-09, à la fusion de
+      # schub-connector-discord#36 : l'identité vit dans le cœur, plus une ligne ici ne les lit.
       # Depuis la phase 3, le connecteur ne connaît plus que le cœur.
       CORE_URL: http://dev-schub-core:8080
       TZ: Europe/Paris

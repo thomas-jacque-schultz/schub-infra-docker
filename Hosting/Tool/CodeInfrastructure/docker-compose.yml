@@ -112,15 +112,11 @@ services:
       MONGO_HOST: schub-mongo
       MONGO_DB: discordbot
       MONGO_USERNAME: bot
-      # Le compte Discord semé en OWNER. La prod portait 245281978054737920 / `admin`, qui
-      # n'est PAS le compte de l'utilisateur — le dev, lui, a toujours eu le bon. Au premier
-      # déploiement, l'OWNER aurait été un compte tiers ; avec le SSO, ce compte aurait tout
-      # obtenu. Corrigé le 18-09.
-      # ⚠️ À RETIRER À LA FUSION de schub-connector-discord#36 — pas avant : sur `develop`,
-      # `UserRepositorySeeding` lit encore `discord.admin.id` sans valeur par défaut. Après la
-      # fusion, plus aucune ligne ne les lit, l'identité ayant migré vers le cœur.
-      DISCORD_ADMIN_ID: 227883780512153610
-      DISCORD_ADMIN_USERNAME: pisel
+      # DISCORD_ADMIN_ID et DISCORD_ADMIN_USERNAME ont été retirées le 18-09, à la fusion de
+      # schub-connector-discord#36 : l'identité vit dans le cœur, plus une ligne ici ne les lit.
+      # Au passage, la valeur qui était ici (245281978054737920 / `admin`) n'était PAS le compte
+      # de l'utilisateur : au premier déploiement, l'OWNER aurait été un compte tiers. La bonne
+      # valeur vit désormais sur `schub-core`, seul service qui sème ce compte.
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Depuis la phase 3, le connecteur ne connaît plus que le cœur : ni Portainer, ni la
       # box, ni les redirections. Les variables correspondantes ont été retirées le 17-09,
