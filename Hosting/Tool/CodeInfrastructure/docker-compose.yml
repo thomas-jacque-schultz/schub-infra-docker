@@ -171,6 +171,8 @@ services:
       CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
       CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
+      # Lot D.4 : résolution d'un Riot ID en puuid à l'ajout d'un membre d'équipe.
+      CONNECTOR_RIOT_URL: http://connector-riot:8080
       # Les redirections ont suivi le domaine dans le cœur à la phase 3. loki est le nœud où
       # les stacks de jeu sont contraintes, donc la cible des redirections.
       PORT_FORWARDING_ENABLED: "true"
