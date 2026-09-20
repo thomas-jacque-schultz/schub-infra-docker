@@ -133,6 +133,11 @@ services:
       CONNECTOR_PORTAINER_URL: http://dev-connector-portainer:8080
       CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
+      # Depuis le lot D.4, le cœur résout un Riot ID en puuid à l'ajout d'un membre d'équipe.
+      # Le défaut du code vise `connector-riot`, le nom de PROD : sans cette ligne, la
+      # résolution échouerait en dev — et silencieusement, puisqu'un membre sans puuid est
+      # accepté puis rattrapé à la revendication. On croirait à un choix, pas à une panne.
+      CONNECTOR_RIOT_URL: http://dev-connector-riot:8080
       # Activé en dev parce que le connecteur Freebox parle au stub, jamais à la vraie box.
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
