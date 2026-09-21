@@ -223,7 +223,7 @@ services:
       # qui fait qu'un retrait de droit prend effet en 15 min au pire.
       # ⚠️ Cette réémission arrive avec schub-back-bff#8 : avant la fusion, une session de
       # dev se termine sèchement au bout de 15 min.
-      AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-900}
+      AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-2592000}
       # Le BFF a besoin de l'id de l'OWNER pour lui attribuer ses permissions à la connexion
       # par mot de passe, qui reste la porte de service jusqu'au lot A.6.
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
