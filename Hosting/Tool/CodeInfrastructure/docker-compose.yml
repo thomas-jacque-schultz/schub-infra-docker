@@ -307,7 +307,7 @@ services:
       # jamais, et un retrait de droit prend effet en 15 min au pire. La valeur de 3600 qui
       # était ici ANNULAIT silencieusement cette décision — le code l'applique, le réglage
       # l'écrasait. Arrive avec schub-back-bff#8.
-      AUTH_JWT_EXPIRATION_SECONDS: 900
+      AUTH_JWT_EXPIRATION_SECONDS: 2592000
       # Permissions de l'OWNER à la connexion par mot de passe, qui reste la porte de service
       # jusqu'au lot A.6 (où elle disparaît entièrement).
       DISCORD_ADMIN_ID: 227883780512153610
