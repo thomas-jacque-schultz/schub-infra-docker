@@ -194,10 +194,12 @@ services:
       MONGO_DB: riot
       MONGO_USERNAME: riot
       MONGO_PASSWORD: ${MONGO_RIOT_PASSWORD}
-      # Clé de développement : elle EXPIRE TOUTES LES 24 H. À régénérer sur
-      # developer.riotgames.com. Vide = connecteur en veille : aucune requête sortante,
-      # le cache déjà constitué reste servi.
+      # Clé personnelle validée : elle n'expire pas. Vide = connecteur en veille : aucune requête
+      # sortante, le cache déjà constitué reste servi.
       RIOT_API_KEY: ${RIOT_API_KEY:-}
+      # La collecte de fond tourne toujours en prod ; ici l'owner la bascule depuis Configuration.
+      RIOT_CRAWLER_SWITCHABLE: "true"
+      RIOT_CRAWLER_ENABLED: "false"
       TZ: Europe/Paris
     depends_on:
       dev-schub-mongo:
