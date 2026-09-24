@@ -226,11 +226,8 @@ services:
       # ⚠️ Cette réémission arrive avec schub-back-bff#8 : avant la fusion, une session de
       # dev se termine sèchement au bout de 15 min.
       AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-2592000}
-      # Le BFF a besoin de l'id de l'OWNER pour lui attribuer ses permissions à la connexion
-      # par mot de passe, qui reste la porte de service jusqu'au lot A.6.
+      # Destinataire des messages du formulaire de contact.
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
-      AUTH_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
-      AUTH_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me}
       # Le proxy /api de Vite relaie l'en-tête Origin du navigateur tel quel : le BFF voit
       # donc une requête « cross-origin » et applique cette liste. Toute origine par
       # laquelle le front est réellement ouvert doit y figurer — http ET https, sinon la
