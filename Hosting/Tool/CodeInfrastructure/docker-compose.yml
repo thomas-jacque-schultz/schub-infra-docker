@@ -50,6 +50,10 @@ secrets:
   # Jeton d'appairage Freebox, obtenu via scripts/freebox-pair.sh du repo schub-connector-freebox.
   FREEBOX_APP_TOKEN:
     external: true
+  # Secret du client OAuth Discord : depuis le retrait du compte local (lot A.6), c'est la seule
+  # porte d'entrée du site. Le BFF le lit par configtree dans /run/secrets/.
+  DISCORD_OAUTH_CLIENT_SECRET:
+    external: true
 
 # Log Configuration
 
@@ -103,7 +107,7 @@ services:
           - node.labels.name == dynamis
 
   connector-discord:
-    image: thomasschultzschub/schub-connector-discord:v2.0.1
+    image: thomasschultzschub/schub-connector-discord:v3.0.0
     networks:
       - schub
     environment:
@@ -153,7 +157,7 @@ services:
   # Sans le point 1, le cœur démarre sur une base vide et la réconciliation ferme les ports
   # de serveurs qui tournent.
   schub-core:
-    image: thomasschultzschub/schub-core:v2.0.1
+    image: thomasschultzschub/schub-core:v3.0.0
     networks:
       - schub
     environment:
@@ -195,7 +199,7 @@ services:
           - node.labels.name == dynamis
 
   connector-portainer:
-    image: thomasschultzschub/schub-connector-portainer:v2.0.1
+    image: thomasschultzschub/schub-connector-portainer:v3.0.0
     networks:
       - schub
     environment:
@@ -218,9 +222,7 @@ services:
   # optimisation, et c'est ce qui rend le quota Riot presque théorique après le premier
   # remplissage.
   connector-riot:
-    # ⚠️ Tag à bumper vers la release qui contient le lot D.2 : l'image v2.0.1 ne contient que
-    # le squelette, sans un seul appel à l'API Riot.
-    image: thomasschultzschub/schub-connector-riot:v2.0.1
+    image: thomasschultzschub/schub-connector-riot:v3.0.0
     networks:
       - schub
     environment:
@@ -247,7 +249,7 @@ services:
           - node.labels.name == dynamis
 
   connector-freebox:
-    image: thomasschultzschub/schub-connector-freebox:v2.0.1
+    image: thomasschultzschub/schub-connector-freebox:v3.0.0
     networks:
       - schub
     environment:
@@ -267,7 +269,7 @@ services:
           - node.labels.name == dynamis
 
   schub-front:
-    image: thomasschultzschub/schub-front:v2.0.1
+    image: thomasschultzschub/schub-front:v3.0.0
     networks:
       - schub
     # Le front parle au BFF, pas au connecteur Discord — son nginx a
@@ -295,7 +297,7 @@ services:
           - node.labels.name == dynamis
 
   schub-bff:
-    image: thomasschultzschub/schub-bff:v2.0.1
+    image: thomasschultzschub/schub-bff:v3.0.0
     networks:
       - schub
     environment:
@@ -311,11 +313,17 @@ services:
       # Destinataire des messages du formulaire de contact.
       DISCORD_ADMIN_ID: 227883780512153610
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
+      # La connexion Discord est la seule depuis le lot A.6 : sans ces trois réglages, personne
+      # n'entre. L'URL doit être déclarée AU CARACTÈRE PRÈS dans le portail développeur Discord.
+      DISCORD_OAUTH_CLIENT_ID: "449160985417089024"
+      DISCORD_OAUTH_REDIRECT_URI: https://schultz-thomas.fr/api/auth/discord/callback
       # Les deux amonts, depuis la phase 4 : le domaine au cœur, Discord au connecteur.
       CORE_URL: http://schub-core:8080
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       TZ: Europe/Paris
+    secrets:
+      - DISCORD_OAUTH_CLIENT_SECRET
     # Rappel : Swarm ignore `depends_on` (cf. schub-mongo). C'est la restart_policy qui tient
     # lieu d'ordre de démarrage.
     depends_on:
