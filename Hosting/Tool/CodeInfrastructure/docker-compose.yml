@@ -308,11 +308,8 @@ services:
       # était ici ANNULAIT silencieusement cette décision — le code l'applique, le réglage
       # l'écrasait. Arrive avec schub-back-bff#8.
       AUTH_JWT_EXPIRATION_SECONDS: 2592000
-      # Permissions de l'OWNER à la connexion par mot de passe, qui reste la porte de service
-      # jusqu'au lot A.6 (où elle disparaît entièrement).
+      # Destinataire des messages du formulaire de contact.
       DISCORD_ADMIN_ID: 227883780512153610
-      AUTH_ADMIN_USERNAME: ${AUTH_ADMIN_USERNAME}
-      AUTH_ADMIN_PASSWORD: ${AUTH_ADMIN_PASSWORD}
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
       # Les deux amonts, depuis la phase 4 : le domaine au cœur, Discord au connecteur.
       CORE_URL: http://schub-core:8080
