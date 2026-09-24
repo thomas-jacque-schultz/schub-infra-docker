@@ -45,6 +45,12 @@ volumes:
       type: none
       device: /mnt/volume/Prometheus/Config
       o: bind
+  prometheus_data:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/volume/Prometheus/Data
+      o: bind
   cloudflare_config:
     driver: local
     driver_opts:
@@ -172,8 +178,12 @@ services:
       - monitoring
     volumes:
       - prometheus_config:/etc/prometheus
+      - prometheus_data:/prometheus
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=15d"
+      - "--storage.tsdb.retention.size=10GB"
     logging: *default-logging
     deploy:
       restart_policy:
