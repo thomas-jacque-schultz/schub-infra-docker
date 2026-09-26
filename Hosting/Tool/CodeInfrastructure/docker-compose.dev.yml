@@ -81,6 +81,8 @@ services:
     command: node server.js
     environment:
       TZ: Europe/Paris
+      # Expire les sessions pour exercer la réouverture du connecteur (auth_required).
+      STUB_SESSION_TTL: ${STUB_SESSION_TTL:-60}
     ports:
       - "127.0.0.1:18099:8080"
     networks:
