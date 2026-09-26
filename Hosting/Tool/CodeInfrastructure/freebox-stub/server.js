@@ -13,6 +13,10 @@
 const http = require("http");
 
 const PORT = Number(process.env.PORT || 8080);
+// Inactivité après laquelle une session expire, comme sur la vraie box. 0 : jamais.
+const SESSION_TTL_MS = Number(process.env.STUB_SESSION_TTL || 0) * 1000;
+const sessions = new Map();
+let sessionSeq = 0;
 
 // Jeu d'essai fictif, calqué sur la FORME de ce qu'on trouve sur la vraie box (règles
 // manuelles sans libellé, et une règle déjà marquée) sans en reprendre les valeurs.
@@ -42,6 +46,18 @@ function mk({ enabled, comment, ip_proto, wan, lan_ip, lan_port }) {
 
 const ok = (result) => ({ success: true, result });
 const ko = (error_code, msg) => ({ success: false, error_code, msg });
+
+function sessionValid(req) {
+  const token = req.headers["x-fbx-app-auth"];
+  const lastUse = sessions.get(token);
+  if (lastUse === undefined) return false;
+  if (SESSION_TTL_MS > 0 && Date.now() - lastUse > SESSION_TTL_MS) {
+    sessions.delete(token);
+    return false;
+  }
+  sessions.set(token, Date.now());
+  return true;
+}
 
 function send(res, status, body) {
   const payload = JSON.stringify(body);
@@ -90,11 +106,23 @@ const server = http.createServer(async (req, res) => {
   }
   if (route === "/login/session/" && req.method === "POST") {
     await readBody(req);
+    const token = `stub-session-${++sessionSeq}`;
+    sessions.set(token, Date.now());
     return send(res, 200, ok({
-      session_token: "stub-session-token",
+      session_token: token,
       // La permission que le connecteur exige pour s'autoriser à écrire.
       permissions: { settings: true, parental: false, explorer: false },
     }));
+  }
+
+  // Réponse de la vraie box sur une session absente ou expirée : 403, et un objet dans result.
+  if (!sessionValid(req)) {
+    return send(res, 403, {
+      success: false,
+      error_code: "auth_required",
+      msg: "Invalid session token, or no session token sent",
+      result: { password_salt: "stub-salt", challenge: "stub-challenge" },
+    });
   }
 
   // --- redirections de ports ---
@@ -154,5 +182,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`Stub Freebox à l'écoute sur :${PORT} — ${redirections.length} redirections en mémoire`);
+  console.log(SESSION_TTL_MS > 0 ? `Sessions expirées après ${SESSION_TTL_MS / 1000} s d'inactivité` : "Sessions sans expiration");
   console.log("Aucune requête ne sort vers la vraie box.");
 });
