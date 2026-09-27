@@ -99,6 +99,9 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # Après un arrêt brutal, la récupération dépasse la minute sans ouvrir le port. Sans ce
+      # délai, Swarm tuait mongod en pleine récupération et chaque relance repartait de zéro.
+      start_period: 15m
     logging: *default-logging
     deploy:
       # Chaque démarrage raté préalloue des fichiers de journal de 100 Mo que mongod ne nettoie
