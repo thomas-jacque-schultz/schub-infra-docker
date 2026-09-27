@@ -248,6 +248,16 @@ services:
       # Discord, préfixe /api de nginx compris. Discord refuse la redirection à la moindre
       # différence, y compris une barre oblique finale.
       DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-http://localhost:18090/api/auth/discord/callback}
+      # Deux fronts, un BFF (Schub#31) : chacun reconnu par son hôte, avec son URL de retour Discord
+      # (à déclarer dans le portail développeur) et sa page d'arrivée. Leurs origines rejoignent le CORS.
+      AUTH_FRONTS_0_KEY: schub
+      AUTH_FRONTS_0_ORIGIN: https://dev.schultz-thomas.fr
+      AUTH_FRONTS_0_REDIRECTURI: https://dev.schultz-thomas.fr/api/auth/discord/callback
+      AUTH_FRONTS_0_POSTLOGINREDIRECT: /
+      AUTH_FRONTS_1_KEY: premadelab
+      AUTH_FRONTS_1_ORIGIN: https://dev.premadelab.eu
+      AUTH_FRONTS_1_REDIRECTURI: https://dev.premadelab.eu/api/auth/discord/callback
+      AUTH_FRONTS_1_POSTLOGINREDIRECT: /
       # ⚠️ false EN DEV, et ce n'est pas un détail. Le front de dev s'ouvre aussi sur
       # http://192.168.1.200:18090 et http://dev.schultz-thomas.fr — des origines en HTTP clair
       # et NON localhost. Un cookie marqué Secure y est SILENCIEUSEMENT ignoré par le
