@@ -101,8 +101,14 @@ services:
       retries: 5
     logging: *default-logging
     deploy:
+      # Chaque démarrage raté préalloue des fichiers de journal de 100 Mo que mongod ne nettoie
+      # jamais : le 26-09, une boucle sans limite a rempli 2,2 To du RAID en 19 h. On abandonne
+      # après 5 échecs en 10 min, la base reste arrêtée jusqu'à intervention.
       restart_policy:
         condition: any
+        delay: 10s
+        max_attempts: 5
+        window: 10m
       placement:
         constraints:
           - node.labels.name == loki
