@@ -84,8 +84,10 @@ tasks:
   # Les identifiants root ne sortent jamais du conteneur : ils sont lus dans /run/secrets/,
   # là où Swarm les monte.
 
+  # Mongo de prod tourne sur loki : un manager Swarm ne fait pas `docker exec` sur un autre nœud.
+  # Lancer ces tâches avec DOCKER_HOST=ssh://<utilisateur>@loki (le client docker le suit).
   db:mongo:prod:id:
-    desc: "Affiche l'identifiant du conteneur Mongo de la stack Swarm"
+    desc: "Affiche l'identifiant du conteneur Mongo de la stack Swarm (DOCKER_HOST=ssh://…@loki)"
     silent: true
     cmds:
       - |

@@ -3,17 +3,15 @@ version: "3.8"
 # Volumes
 
 volumes:
-  # Données réelles de la prod, écrites par le déploiement qui a tourné jusqu'en avril 2026.
-  # Le chemin pointait sur /mnt/volume/BotFront/Database, QUI N'EXISTE PAS : avec `o: bind`,
-  # Docker refuse de monter un chemin absent et le service ne démarrait pas. Corrigé le 17-09.
-  # Cette base est à l'ANCIEN schéma (identifier, portainerStackId) : la migration
-  # mongo-migrate-servers-to-core.js doit y passer avant le premier démarrage du cœur.
+  # Sur le NVMe de loki : sur le RAID de dynamis, partagé avec les médias, Mongo attendait le disque
+  # (incident du 27-09). Chemin LOCAL À LOKI, à créer avant le déploiement (propriétaire 999,
+  # l'utilisateur de l'image mongo) : avec `o: bind`, Docker refuse un chemin absent.
   mongo_data:
     driver: local
     driver_opts:
       type: none
       o: bind
-      device: /mnt/volume/MongoBot
+      device: /mnt/volume/Schub/Mongo
   # Le volume port_forwarding_config a été retiré le 17-09. Les règles permanentes vivaient
   # dans /mnt/volume/PortForwarding/port-forwarding.yml, relu au démarrage ; depuis la phase 3
   # elles sont en base (`static_port_rules`) et pilotées par l'API du cœur. LE FICHIER EXISTE
@@ -107,7 +105,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   connector-discord:
     image: thomasschultzschub/schub-connector-discord:v3.0.0
@@ -148,7 +146,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   # Le cœur : tout le domaine. Ajouté en phase 4 — il n'existait pas dans ce fichier, alors
   # que le BFF n'a plus rien d'autre vers qui router le domaine.
@@ -199,7 +197,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   connector-portainer:
     image: thomasschultzschub/schub-connector-portainer:v3.0.0
@@ -217,7 +215,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   # Connecteur Riot — lot D.2. À la différence des connecteurs Portainer et Freebox, il POSSÈDE
   # une base : il porte le cache des parties. Une partie terminée est immuable, donc collectée
@@ -233,6 +231,8 @@ services:
       MONGO_HOST: schub-mongo
       MONGO_DB: riot
       MONGO_USERNAME: riot
+      # 400 Go : loki garde de la place pour les serveurs de jeu qui partagent son NVMe.
+      RIOT_STORAGE_ALERT_BYTES: "400000000000"
       TZ: Europe/Paris
     secrets:
       # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
@@ -249,7 +249,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   connector-freebox:
     image: thomasschultzschub/schub-connector-freebox:v3.0.0
@@ -268,8 +268,8 @@ services:
         condition: any
       placement:
         constraints:
-          # Doit joindre mafreebox.freebox.fr sur le LAN.
-          - node.labels.name == dynamis
+          # Doit joindre mafreebox.freebox.fr sur le LAN : loki y est, comme dynamis.
+          - node.labels.name == loki
 
   schub-front:
     image: thomasschultzschub/schub-front:v3.0.0
@@ -297,7 +297,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
   schub-bff:
     image: thomasschultzschub/schub-bff:v3.0.0
@@ -338,7 +338,7 @@ services:
         condition: any
       placement:
         constraints:
-          - node.labels.name == dynamis
+          - node.labels.name == loki
 
 # Networks
 
