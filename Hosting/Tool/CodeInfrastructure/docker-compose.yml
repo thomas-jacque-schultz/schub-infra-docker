@@ -121,7 +121,7 @@ services:
           - node.labels.name == loki
 
   connector-discord:
-    image: thomasschultzschub/schub-connector-discord:v3.1.1
+    image: thomasschultzschub/schub-connector-discord:v3.1.2
     networks:
       - schub
     environment:
@@ -171,7 +171,7 @@ services:
   # Sans le point 1, le cœur démarre sur une base vide et la réconciliation ferme les ports
   # de serveurs qui tournent.
   schub-core:
-    image: thomasschultzschub/schub-core:v3.1.1
+    image: thomasschultzschub/schub-core:v3.1.2
     networks:
       - schub
     environment:
@@ -213,7 +213,7 @@ services:
           - node.labels.name == loki
 
   connector-portainer:
-    image: thomasschultzschub/schub-connector-portainer:v3.1.1
+    image: thomasschultzschub/schub-connector-portainer:v3.1.2
     networks:
       - schub
     environment:
@@ -236,7 +236,7 @@ services:
   # optimisation, et c'est ce qui rend le quota Riot presque théorique après le premier
   # remplissage.
   connector-riot:
-    image: thomasschultzschub/schub-connector-riot:v3.1.1
+    image: thomasschultzschub/schub-connector-riot:v3.1.2
     networks:
       - schub
     environment:
@@ -265,7 +265,7 @@ services:
           - node.labels.name == loki
 
   connector-freebox:
-    image: thomasschultzschub/schub-connector-freebox:v3.1.1
+    image: thomasschultzschub/schub-connector-freebox:v3.1.2
     networks:
       - schub
     environment:
@@ -285,7 +285,7 @@ services:
           - node.labels.name == loki
 
   schub-front:
-    image: thomasschultzschub/schub-front:v3.1.1
+    image: thomasschultzschub/schub-front:v3.1.2
     networks:
       - schub
     # Le front parle au BFF, pas au connecteur Discord — son nginx a
@@ -313,7 +313,7 @@ services:
           - node.labels.name == loki
 
   schub-bff:
-    image: thomasschultzschub/schub-bff:v3.1.1
+    image: thomasschultzschub/schub-bff:v3.1.2
     networks:
       - schub
     environment:
