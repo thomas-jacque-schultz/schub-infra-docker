@@ -52,6 +52,10 @@ secrets:
   # porte d'entrée du site. Le BFF le lit par configtree dans /run/secrets/.
   DISCORD_OAUTH_CLIENT_SECRET:
     external: true
+  # Secret partagé entre les services de la stack (en-tête X-Internal-Secret). Monté en fichier et lu par
+  # configtree : surtout pas en variable d'environnement, qui passerait avant le fichier pour Spring.
+  SCHUB_INTERNAL_SECRET:
+    external: true
 
 # Log Configuration
 
@@ -131,13 +135,13 @@ services:
       # Au passage, la valeur qui était ici (245281978054737920 / `admin`) n'était PAS le compte
       # de l'utilisateur : au premier déploiement, l'OWNER aurait été un compte tiers. La bonne
       # valeur vit désormais sur `schub-core`, seul service qui sème ce compte.
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Depuis la phase 3, le connecteur ne connaît plus que le cœur : ni Portainer, ni la
       # box, ni les redirections. Les variables correspondantes ont été retirées le 17-09,
       # elles n'étaient plus lues par aucune ligne de code.
       CORE_URL: http://schub-core:8080
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
       # via configtree, sans savoir de quel secret Swarm il vient.
       - source: MONGO_BOT_PASSWORD
@@ -175,7 +179,6 @@ services:
       MONGO_HOST: schub-mongo
       MONGO_DB: servers
       MONGO_USERNAME: servers
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Depuis le lot A.1, c'est LE CŒUR qui détient l'identité et sème le compte OWNER —
       # à chaque démarrage, pas seulement à la première migration : c'est le garde-fou qui
       # rend impossible de se verrouiller dehors en changeant les rôles.
@@ -196,6 +199,7 @@ services:
       PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       - source: MONGO_SERVERS_PASSWORD
         target: MONGO_PASSWORD
     depends_on:
@@ -213,10 +217,10 @@ services:
     networks:
       - schub
     environment:
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       PORTAINER_VIRTUAL_HOST: http://admin-portainer:9000
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       - source: PORTAINER_TOKEN
     logging: *default-logging
     deploy:
@@ -236,7 +240,6 @@ services:
     networks:
       - schub
     environment:
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       MONGO_HOST: schub-mongo
       MONGO_DB: riot
       MONGO_USERNAME: riot
@@ -244,6 +247,7 @@ services:
       RIOT_STORAGE_ALERT_BYTES: "400000000000"
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
       # par configtree, sans savoir de quel secret Swarm il vient.
       - source: MONGO_RIOT_PASSWORD
@@ -265,11 +269,11 @@ services:
     networks:
       - schub
     environment:
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       # Identité de l'application côté Freebox (bloc infra, à changer si la box change).
       FREEBOX_DEVICE_NAME: dynamis
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       - source: FREEBOX_APP_TOKEN
     logging: *default-logging
     deploy:
@@ -342,9 +346,9 @@ services:
       # Les deux amonts, depuis la phase 4 : le domaine au cœur, Discord au connecteur.
       CORE_URL: http://schub-core:8080
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
-      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET}
       TZ: Europe/Paris
     secrets:
+      - SCHUB_INTERNAL_SECRET
       - DISCORD_OAUTH_CLIENT_SECRET
     # Rappel : Swarm ignore `depends_on` (cf. schub-mongo). C'est la restart_policy qui tient
     # lieu d'ordre de démarrage.
