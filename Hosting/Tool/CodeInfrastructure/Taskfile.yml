@@ -14,6 +14,11 @@ tasks:
     cmds:
       - "{{.COMPOSE_CMD}} up --build -d --force-recreate"
 
+  dev:release:
+    desc: "Rejoue une release publiée sur le dev, avec ses images. Usage: task dev:release -- v3.1.1 ; `task dev` revient aux sources"
+    cmds:
+      - "SCHUB_RELEASE={{.CLI_ARGS}} {{.COMPOSE_CMD}} -f docker-compose.dev-release.yml up -d --pull always"
+
   dev:restart:
     desc: "Redémarre un service sans rebuild. Usage: task dev:restart -- dev-connector-discord"
     cmds:
