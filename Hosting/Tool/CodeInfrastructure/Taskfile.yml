@@ -54,37 +54,21 @@ tasks:
           mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
           --quiet --eval "$(cat mongo-init-databases.js)"
 
-  db:migrate:legacy:
-    desc: "ONE-SHOT : déplace discordbot.servers -> servers.servers (ancien schéma). Voir la description."
-    # Le SEUL script de migration lancé à la main du système. Il enjambe deux bases, ce que
-    # le cœur n'a pas le droit de faire : son utilisateur Mongo n'a de droits que sur `servers`.
-    # Lui donner ce droit pour un besoin unique et définitif coûterait le cloisonnement.
-    #
-    # Tout le reste du schéma appartient à Mongock, dans schub-core, paquet `core.migration` :
-    # appliqué au démarrage, tracé en base, jamais rejoué. Rien à lancer.
-    #
-    # Rejouable sans risque (repère par _id, ne supprime jamais la source).
-    cmds:
-      - |
-        set -a; . .env.dev.example; set +a
-        {{.COMPOSE_CMD}} exec -T dev-schub-mongo \
-          mongosh "mongodb://$MONGO_ROOT_USERNAME:$MONGO_ROOT_PASSWORD@localhost:27017/admin" \
-          --quiet --eval "$(cat mongo-migrate-servers-to-core.js)"
-
   # --- PROD ------------------------------------------------------------------
   #
-  # Les deux tâches ci-dessus visent la stack de DEV, via docker compose. La prod est une
-  # stack Swarm : ni compose, ni le même nom de conteneur. D'où ces deux jumelles.
+  # La tâche ci-dessus vise la stack de DEV, via docker compose. La prod est une stack
+  # Swarm : ni compose, ni le même nom de conteneur. D'où sa jumelle.
+  #
+  # Le schéma appartient à Mongock, dans schub-core : appliqué au démarrage, rien à lancer.
   #
   # L'ORDRE, et pourquoi il n'y a pas d'impasse : `schub-mongo` n'a aucun depends_on, il
-  # démarre seul. Les autres services planteront en boucle tant que les utilisateurs et les
-  # données ne sont pas là — c'est sans gravité, `restart_policy: any` les relance et ils
-  # repartent d'eux-mêmes ensuite.
+  # démarre seul. Les autres services planteront en boucle tant que les utilisateurs ne sont
+  # pas là — c'est sans gravité, `restart_policy: any` les relance et ils repartent d'eux-mêmes
+  # ensuite.
   #
   #   1. déployer la stack           (mongo monte, le reste boucle)
   #   2. task db:init:prod           (crée les utilisateurs)
-  #   3. task db:migrate:prod        (déplace les données de l'ancien schéma)
-  #   4. les services se rattrapent tout seuls au redémarrage suivant
+  #   3. les services se rattrapent tout seuls au redémarrage suivant
   #
   # Les identifiants root ne sortent jamais du conteneur : ils sont lus dans /run/secrets/,
   # là où Swarm les monte.
@@ -127,17 +111,6 @@ tasks:
             --username "$(cat /run/secrets/MONGO_ROOT_USERNAME)" \
             --password "$(cat /run/secrets/MONGO_ROOT_PASSWORD)" \
             --authenticationDatabase admin --eval "$1"' _ "$(cat mongo-init-databases.js)"
-
-  db:migrate:prod:
-    desc: "PROD, ONE-SHOT : déplace discordbot.servers -> servers.servers. À jouer AVANT le premier démarrage du cœur."
-    cmds:
-      - |
-        set -e
-        cid=$(task db:mongo:prod:id)
-        docker exec -i "$cid" sh -c 'mongosh --quiet --host localhost:27017 \
-          --username "$(cat /run/secrets/MONGO_ROOT_USERNAME)" \
-          --password "$(cat /run/secrets/MONGO_ROOT_PASSWORD)" \
-          --authenticationDatabase admin --eval "$1"' _ "$(cat mongo-migrate-servers-to-core.js)"
 
   bootstrap:
     desc: "Environnement de dev complet : conteneurs puis bases Mongo"
