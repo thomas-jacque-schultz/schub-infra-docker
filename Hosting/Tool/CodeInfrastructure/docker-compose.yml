@@ -164,12 +164,8 @@ services:
   # Le cœur : tout le domaine. Ajouté en phase 4 — il n'existait pas dans ce fichier, alors
   # que le BFF n'a plus rien d'autre vers qui router le domaine.
   #
-  # ATTENTION, deux préalables avant le premier démarrage :
-  #   1. `task db:migrate:legacy` contre CETTE base — elle est à l'ancien schéma (§6 bis).
-  #   2. le secret Swarm MONGO_SERVERS_PASSWORD, et l'utilisateur `servers` créé par
-  #      mongo-init-databases.js.
-  # Sans le point 1, le cœur démarre sur une base vide et la réconciliation ferme les ports
-  # de serveurs qui tournent.
+  # Préalable au premier démarrage : le secret Swarm MONGO_SERVERS_PASSWORD, et l'utilisateur
+  # `servers` créé par mongo-init-databases.js.
   schub-core:
     image: thomasschultzschub/schub-core:v3.1.2
     networks:
