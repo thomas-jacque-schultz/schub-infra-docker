@@ -1,11 +1,12 @@
 # Pages de panne et de MEP devant Schub et PremadeLab (Schub#76). Routes sur les noms exacts :
 # les autres sous-domaines de schultz-thomas.fr (Nextcloud, Grafana…) ne passent jamais par ce Worker.
+# Toujours déployer avec --env : schub-edge-dev et schub-edge-prod.
+name = "schub-edge"
 main = "src/worker.js"
 compatibility_date = "2026-06-01"
 workers_dev = false
 
 [env.dev]
-name = "schub-edge-dev"
 routes = [
   { pattern = "dev.premadelab.eu/*", zone_name = "premadelab.eu" },
   { pattern = "dev.schultz-thomas.fr/*", zone_name = "schultz-thomas.fr" },
@@ -13,7 +14,6 @@ routes = [
 vars = { MAINTENANCE = "off" }
 
 [env.prod]
-name = "schub-edge"
 routes = [
   { pattern = "premadelab.eu/*", zone_name = "premadelab.eu" },
   { pattern = "schultz-thomas.fr/*", zone_name = "schultz-thomas.fr" },
