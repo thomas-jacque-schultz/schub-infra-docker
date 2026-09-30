@@ -1,0 +1,40 @@
+version: "3"
+
+# CLOUDFLARE_API_TOKEN dans .env (ignoré par git) : Workers Scripts en écriture sur le compte,
+# Workers Routes en écriture sur les zones premadelab.eu et schultz-thomas.fr.
+dotenv: [".env"]
+
+vars:
+  ENV: '{{.ENV | default "dev"}}'
+  WRANGLER: npx --no-install wrangler
+
+tasks:
+  install:
+    desc: "Installe wrangler (version fixée dans package.json)"
+    cmds:
+      - npm ci
+
+  test:
+    desc: "Teste le Worker (node:test, sans Cloudflare)"
+    cmds:
+      - npm test
+
+  deploy:
+    desc: "Déploie le Worker, maintenance coupée. Usage: task deploy ENV=dev|prod"
+    cmds:
+      - "{{.WRANGLER}} deploy --env {{.ENV}}"
+
+  maintenance:on:
+    desc: "Page de MEP sur tout le site (sauf cookie de contournement). Usage: task maintenance:on ENV=prod"
+    cmds:
+      - "{{.WRANGLER}} deploy --env {{.ENV}} --var MAINTENANCE:on"
+
+  maintenance:off:
+    desc: "Rend le site. Usage: task maintenance:off ENV=prod"
+    cmds:
+      - task: deploy
+
+  bypass:set:
+    desc: "Pose le jeton de contournement (saisi au clavier). Puis ouvrir https://<domaine>/.maintenance/bypass?token=<jeton>"
+    cmds:
+      - "{{.WRANGLER}} secret put BYPASS_TOKEN --env {{.ENV}}"
