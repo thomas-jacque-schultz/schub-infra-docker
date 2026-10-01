@@ -1,10 +1,17 @@
 # Minecraft PO3 Stack Configuration for Docker Swarm
 
-networks:
-  schub:
-    external: true
+# Volumes
+
+volumes:
+  minecraft_or_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/Minecraft/ProjectOzoneReborn
 
 # Secrets
+
 secrets:
   MINECRAFT_RCON_PASSWORD:
     external: true
@@ -12,6 +19,7 @@ secrets:
     external: true
 
 # Log Configuration
+
 x-logging:
   &default-logging
   driver: "json-file"
@@ -20,7 +28,8 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
-# Container Configuration
+# Services
+
 services:
 
   gaming-minecraft-ozone-reborn:
@@ -56,10 +65,8 @@ services:
         constraints:
           - node.labels.name == loki
 
-volumes:
-  minecraft_or_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/Minecraft/ProjectOzoneReborn
+# Networks
+
+networks:
+  schub:
+    external: true

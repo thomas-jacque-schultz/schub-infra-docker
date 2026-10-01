@@ -33,7 +33,6 @@ services:
     image: vaultwarden/server:1.37.2
     networks:
       - schub
-    logging: *default-logging
     volumes:
       - vault_data:/data
     secrets:
@@ -41,6 +40,7 @@ services:
     environment:
       DOMAIN: "https://vault.schultz-thomas.fr"
       ADMIN_TOKEN_FILE: /run/secrets/VAULT_TOKEN
+    logging: *default-logging
     deploy:
       restart_policy:
         condition: any

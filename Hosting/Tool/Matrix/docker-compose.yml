@@ -52,13 +52,13 @@ services:
       - matrix-internal
     volumes:
       - matrix_postgres:/var/lib/postgresql/data
+    secrets:
+      - POSTGRES_PASSWORD
     environment:
       POSTGRES_DB: synapse
       POSTGRES_USER: synapse
       POSTGRES_PASSWORD_FILE: /run/secrets/POSTGRES_PASSWORD
       POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
-    secrets:
-      - POSTGRES_PASSWORD
     logging: *default-logging
     deploy:
       restart_policy:
@@ -74,16 +74,16 @@ services:
       - matrix-internal
     volumes:
       - matrix_data:/data
+    secrets:
+      - POSTGRES_PASSWORD
+      - MATRIX_REGISTRATION_SECRET
     environment:
       SYNAPSE_SERVER_NAME: matrix.schultz-thomas.fr
       SYNAPSE_REPORT_STATS: "no"
       TZ: Europe/Paris
-    secrets:
-      - POSTGRES_PASSWORD
-      - MATRIX_REGISTRATION_SECRET
-    logging: *default-logging
     depends_on:
       - matrix-postgres
+    logging: *default-logging
     deploy:
       restart_policy:
         condition: any
@@ -115,4 +115,3 @@ networks:
   matrix-internal:
     driver: overlay
     internal: true
-

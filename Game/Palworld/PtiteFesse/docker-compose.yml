@@ -1,11 +1,14 @@
-#Principale Network Configuration
+# Volumes
 
-networks:
-  schub:
-    external: true
+volumes:
+  palworld_data_ptite_fesse:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/Palworld/Palworld_PtiteFesse
 
-
-#Log Configuration
+# Log Configuration
 
 x-logging:
   &default-logging
@@ -15,7 +18,7 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
-#Container Configuration
+# Services
 
 services:
 
@@ -28,7 +31,6 @@ services:
       - 27016:27016/udp
     volumes:
       - palworld_data_ptite_fesse:/palworld/
-    stop_grace_period: 30s # Set to however long you are willing to wait for the container to gracefully stop
     environment:
       AUTO_UPDATE_ENABLED: "true"
       PUID: 1000
@@ -56,6 +58,7 @@ services:
       PLAYER_STAMINA_DECREASE_RATE : "0.300000"
       PAL_CAPTURE_RATE : "2.000000"
       EXP_RATE : "2.000000"
+    stop_grace_period: 30s # Set to however long you are willing to wait for the container to gracefully stop
     logging: *default-logging
     deploy:
       resources:
@@ -67,13 +70,8 @@ services:
         constraints:
           - node.labels.name == loki
 
+# Networks
 
-# Volume
-
-volumes:
-  palworld_data_ptite_fesse:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/Palworld/Palworld_PtiteFesse
+networks:
+  schub:
+    external: true

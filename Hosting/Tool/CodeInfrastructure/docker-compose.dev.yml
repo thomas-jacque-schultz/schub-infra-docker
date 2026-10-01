@@ -1,255 +1,185 @@
 name: schub-dev
 
-# Réseaux
-#
-# Deux réseaux, et c'est délibéré (cf. plan §9) :
-#
-#  - `schub-dev` est privé à cette stack. Tout le trafic interne du dev y passe.
-#  - `schub` est l'overlay partagé avec la prod. Seul le front y est attaché, parce que
-#    le tunnel Cloudflare y vit et doit pouvoir le joindre.
-#
-# Les services de dev sont préfixés `dev-`. Sans ça, dev et prod publieraient les mêmes
-# noms courts sur `schub` et le tunnel servirait l'un pour l'autre — le jour où la prod
-# sera déployée, pas avant, ce qui rendrait la panne d'autant plus difficile à lire.
+# Volumes
+
+volumes:
+  mongo_data_dev:
+
+# Services
 
 services:
   dev-schub-mongo:
     image: mongo:7
-    # --quiet : sans lui, chaque passage de la sonde écrit ses connexions dans le log.
-    command: ["mongod", "--quiet"]
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo_data_dev:/data/db
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB}
       TZ: Europe/Paris
-    volumes:
-      # Volume Docker propre au projet (schub-dev_mongo_data_dev). La prod, elle, bind-monte
-      # /mnt/volume/BotFront/Database : les deux bases ne peuvent pas se toucher.
-      - mongo_data_dev:/data/db
+    command: ["mongod", "--quiet"]
     healthcheck:
-      # Sonde TCP : mongosh ouvre cinq connexions par passage, chacune journalisée même en --quiet.
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27017"]
       interval: 10s
       timeout: 5s
       retries: 5
-    ports:
-      - "127.0.0.1:27017:27017"
-    networks:
-      - schub-dev
 
   dev-connector-discord:
     build:
       context: ../../../../Schub/schub-connector-discord
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18081:8080"
     volumes:
-      # Chemin hôte réel (pas le chemin vu dans ce conteneur) : docker.sock est
-      # celui de l'hôte, donc les volumes bind sont résolus par son dockerd, qui
-      # ne connaît que /home/pisel/... — voir Admin/Manager/docker-compose.yml.
       - /home/pisel/projet/Schub/schub-connector-discord/src:/usr/src/app/src
     environment:
-      # Utilisateur propre à sa base, créé par `task db:init`. Le connecteur détenait les
-      # identifiants root jusqu'au 17-09 — il ne les a plus (cf. plan §3, cloisonnement).
       MONGO_HOST: dev-schub-mongo
       MONGO_DB: ${MONGO_DB}
       MONGO_USERNAME: bot
       MONGO_PASSWORD: ${MONGO_BOT_PASSWORD}
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       DISCORD_TOKEN: ${DISCORD_TOKEN}
-      # DISCORD_ADMIN_ID et DISCORD_ADMIN_USERNAME ont été retirées le 18-09, à la fusion de
-      # schub-connector-discord#36 : l'identité vit dans le cœur, plus une ligne ici ne les lit.
-      # Depuis la phase 3, le connecteur ne connaît plus que le cœur.
       CORE_URL: http://dev-schub-core:8080
       TZ: Europe/Paris
     depends_on:
       dev-schub-mongo:
         condition: service_healthy
-      # `service_healthy` et non `service_started` : le cœur applique les migrations Mongock
-      # au démarrage et ne devient « prêt » qu'après. Sans ça, le premier pull tomberait sur
-      # un schéma en cours de transformation.
       dev-schub-core:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:18081:8080"
-    networks:
-      - schub-dev
 
-  # Fausse Freebox. Il n'existe qu'UNE vraie box, partagée par le dev et la prod :
-  # sans ce stub, un dev sorti du dry-run écrirait sur le routeur réel et fermerait les
-  # ports de production. Aucune séparation de base de données ne protège de ça.
+  # Une seule vraie box pour le dev et la prod : le dev ne parle qu'à ce stub.
   dev-freebox-stub:
     image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - /home/pisel/projet/schub-infra-docker/Hosting/Tool/CodeInfrastructure/freebox-stub:/app:ro
-    command: node server.js
-    environment:
-      TZ: Europe/Paris
-      # Expire les sessions pour exercer la réouverture du connecteur (auth_required).
-      STUB_SESSION_TTL: ${STUB_SESSION_TTL:-60}
-    ports:
-      - "127.0.0.1:18099:8080"
     networks:
       - schub-dev
+    ports:
+      - "127.0.0.1:18099:8080"
+    volumes:
+      - /home/pisel/projet/schub-infra-docker/Hosting/Tool/CodeInfrastructure/freebox-stub:/app:ro
+    environment:
+      TZ: Europe/Paris
+      STUB_SESSION_TTL: ${STUB_SESSION_TTL:-60}
+    working_dir: /app
+    command: node server.js
 
   dev-connector-freebox:
     build:
       context: ../../../../Schub/schub-connector-freebox
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18084:8080"
     volumes:
       - /home/pisel/projet/Schub/schub-connector-freebox/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
-      # En dev on parle au stub, JAMAIS à la vraie box.
       FREEBOX_BASE_URL: ${FREEBOX_BASE_URL:-http://dev-freebox-stub:8080}
-      # Le stub ne vérifie pas le jeton ; il doit juste être non vide, sinon le
-      # connecteur reste en veille et n'émet aucune requête.
       FREEBOX_APP_TOKEN: ${FREEBOX_APP_TOKEN:-stub-token}
       TZ: Europe/Paris
     depends_on:
       - dev-freebox-stub
-    ports:
-      - "127.0.0.1:18084:8080"
-    networks:
-      - schub-dev
 
-  # Squelettes des phases à venir : ils démarrent, répondent /actuator/health et rien de
-  # plus. Déclarés dès maintenant pour que l'environnement de dev ait la forme de
-  # l'architecture cible, et qu'une phase commence sur une stack qui tourne déjà.
   dev-schub-core:
     build:
       context: ../../../../Schub/schub-core
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18083:8080"
     volumes:
       - /home/pisel/projet/Schub/schub-core/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
-      # Utilisateur propre à sa base, créé par `task db:init`. Le cœur détient la
-      # collection `servers` (plan §3) et n'a pas à connaître les identifiants root.
       MONGO_HOST: dev-schub-mongo
       MONGO_DB: servers
       MONGO_USERNAME: servers
       MONGO_PASSWORD: ${MONGO_SERVERS_PASSWORD}
-      # Depuis le lot A.1, c'est LE CŒUR qui détient l'identité et sème le compte OWNER —
-      # à chaque démarrage, pas seulement à la première migration : c'est le garde-fou qui
-      # rend impossible de se verrouiller dehors en changeant les rôles.
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
       DISCORD_ADMIN_USERNAME: ${DISCORD_ADMIN_USERNAME}
-      # Le cœur pilote les connecteurs ; il ne connaît ni Portainer ni la box.
       CONNECTOR_PORTAINER_URL: http://dev-connector-portainer:8080
       CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
-      # Depuis le lot D.4, le cœur résout un Riot ID en puuid à l'ajout d'un membre d'équipe.
-      # Le défaut du code vise `connector-riot`, le nom de PROD : sans cette ligne, la
-      # résolution échouerait en dev — et silencieusement, puisqu'un membre sans puuid est
-      # accepté puis rattrapé à la revendication. On croirait à un choix, pas à une panne.
       CONNECTOR_RIOT_URL: http://dev-connector-riot:8080
-      # Activé en dev parce que le connecteur Freebox parle au stub, jamais à la vraie box.
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
     depends_on:
       dev-schub-mongo:
         condition: service_healthy
-    # La sonde de disponibilité ne passe au vert qu'une fois le contexte Spring démarré,
-    # donc APRÈS les migrations Mongock. C'est elle qui donne son sens au `service_healthy`
-    # des autres services : « le schéma est à jour », pas seulement « le port répond ».
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 12
       start_period: 40s
-    ports:
-      - "127.0.0.1:18083:8080"
-    networks:
-      - schub-dev
 
   dev-connector-portainer:
     build:
       context: ../../../../Schub/schub-connector-portainer
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+      - schub
+    ports:
+      - "127.0.0.1:18086:8080"
     volumes:
       - /home/pisel/projet/Schub/schub-connector-portainer/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
-      # Le jeton d'API suit le service : depuis la phase 2, lui seul parle à Portainer.
       PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
       PORTAINER_TOKEN: ${PORTAINER_TOKEN}
       TZ: Europe/Paris
-    ports:
-      - "127.0.0.1:18086:8080"
-    networks:
-      - schub-dev
-      # Aussi sur l'overlay partagé : `admin-portainer` y vit (plan §9). C'est désormais
-      # le seul service de dev qui en a besoin.
-      - schub
 
   dev-connector-riot:
     build:
       context: ../../../../Schub/schub-connector-riot
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18085:8080"
     volumes:
       - /home/pisel/projet/Schub/schub-connector-riot/src:/usr/src/app/src
     environment:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
-      # Le connecteur Riot possède une base depuis le lot D.2, et c'est voulu : il porte le
-      # cache des parties. Une partie terminée est immuable, donc collectée une seule fois —
-      # c'est une exigence d'architecture, pas une optimisation.
       MONGO_HOST: dev-schub-mongo
       MONGO_DB: riot
       MONGO_USERNAME: riot
       MONGO_PASSWORD: ${MONGO_RIOT_PASSWORD}
-      # Clé personnelle validée : elle n'expire pas. Vide = connecteur en veille : aucune requête
-      # sortante, le cache déjà constitué reste servi.
       RIOT_API_KEY: ${RIOT_API_KEY:-}
-      # La collecte de fond tourne toujours en prod ; ici l'owner la bascule depuis Configuration.
       RIOT_CRAWLER_SWITCHABLE: "true"
       RIOT_CRAWLER_ENABLED: "false"
       TZ: Europe/Paris
     depends_on:
       dev-schub-mongo:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:18085:8080"
-    networks:
-      - schub-dev
 
   dev-schub-bff:
     build:
       context: ../../../../Schub/schub-back-bff
       dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18082:8080"
     volumes:
       - /home/pisel/projet/Schub/schub-back-bff/src:/usr/src/app/src
     environment:
-      # Le BFF est SANS ÉTAT depuis la phase 4 : il n'a plus de dépendance Mongo (elle ne
-      # servait à rien) et donc plus d'identifiants root. Il ne connaît que ses deux amonts.
       AUTH_JWT_SECRET: ${APP_JWT_SECRET:-change-this-jwt-secret-key-with-at-least-32-characters}
-      # 900 s = 15 min, décision du 18-09. Le BFF réémet le jeton à chaque requête à
-      # laquelle il reste moins de la moitié de sa durée de vie, donc un utilisateur actif
-      # ne se reconnecte jamais — c'est ce qui rend une durée courte tenable, et c'est ce
-      # qui fait qu'un retrait de droit prend effet en 15 min au pire.
-      # ⚠️ Cette réémission arrive avec schub-back-bff#8 : avant la fusion, une session de
-      # dev se termine sèchement au bout de 15 min.
       AUTH_JWT_EXPIRATION_SECONDS: ${APP_JWT_EXPIRATION_SECONDS:-2592000}
-      # Destinataire des messages du formulaire de contact.
       DISCORD_ADMIN_ID: ${DISCORD_ADMIN_ID}
-      # Le proxy /api de Vite relaie l'en-tête Origin du navigateur tel quel : le BFF voit
-      # donc une requête « cross-origin » et applique cette liste. Toute origine par
-      # laquelle le front est réellement ouvert doit y figurer — http ET https, sinon la
-      # page s'affiche mais la connexion part en 403 « Invalid CORS request ».
       AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,http://dev.schultz-thomas.fr,https://dev.schultz-thomas.fr,http://192.168.1.200:18090}
-      # --- Connexion Discord, lot A.3 ---
-      # Le client id n'est pas un secret : il est public par conception, Discord l'expose dans
-      # l'URL d'autorisation. Le client secret, lui, ne vit que dans .env.dev ici, et dans un
-      # secret Swarm en prod.
       DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID}
       DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET}
-      # Doit correspondre AU CARACTÈRE PRÈS à ce qui est déclaré dans le portail développeur
-      # Discord, préfixe /api de nginx compris. Discord refuse la redirection à la moindre
-      # différence, y compris une barre oblique finale.
       DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-http://localhost:18090/api/auth/discord/callback}
-      # Deux fronts, un BFF (Schub#31) : chacun reconnu par son hôte, avec son URL de retour Discord
-      # (à déclarer dans le portail développeur) et sa page d'arrivée. Leurs origines rejoignent le CORS.
       AUTH_FRONTS_0_KEY: schub
       AUTH_FRONTS_0_ORIGIN: https://dev.schultz-thomas.fr
       AUTH_FRONTS_0_REDIRECTURI: https://dev.schultz-thomas.fr/api/auth/discord/callback
@@ -258,51 +188,35 @@ services:
       AUTH_FRONTS_1_ORIGIN: https://dev.premadelab.eu
       AUTH_FRONTS_1_REDIRECTURI: https://dev.premadelab.eu/api/auth/discord/callback
       AUTH_FRONTS_1_POSTLOGINREDIRECT: /
-      # ⚠️ false EN DEV, et ce n'est pas un détail. Le front de dev s'ouvre aussi sur
-      # http://192.168.1.200:18090 et http://dev.schultz-thomas.fr — des origines en HTTP clair
-      # et NON localhost. Un cookie marqué Secure y est SILENCIEUSEMENT ignoré par le
-      # navigateur : la connexion Discord se déroulerait sans erreur, la redirection aurait
-      # lieu, et tu resterais déconnecté sans une ligne dans les journaux pour l'expliquer.
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-false}
-      # Les deux amonts, depuis la phase 4. Le domaine va au cœur, Discord au connecteur.
       CORE_URL: http://dev-schub-core:8080
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       TZ: Europe/Paris
     depends_on:
-      # Le cœur SAIN : sa sonde ne passe au vert qu'après les migrations Mongock. Le BFF ne
-      # doit pas servir de fiches lues sur un schéma en cours de transformation.
       dev-schub-core:
         condition: service_healthy
       dev-connector-discord:
         condition: service_started
-    ports:
-      - "127.0.0.1:18082:8080"
-    networks:
-      - schub-dev
 
   dev-schub-front:
     image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - /home/pisel/projet/Schub/schub-front-servers:/app
-    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
-    environment:
-      # Cible du proxy /api du serveur Vite (voir vite.config.js). Sans elle, les appels
-      # du navigateur tombent sur le serveur de dev, qui ne sait pas les router.
-      API_PROXY_TARGET: http://dev-schub-bff:8080
-      TZ: Europe/Paris
-    depends_on:
-      - dev-schub-bff
-    ports:
-      - "18090:80"
     networks:
-      # Seul service à joindre l'overlay partagé : le tunnel Cloudflare y vit.
       - schub-dev
       - schub
+    ports:
+      - "18090:80"
+    volumes:
+      - /home/pisel/projet/Schub/schub-front-servers:/app
+    environment:
+      API_PROXY_TARGET: http://dev-schub-bff:8080
+      TZ: Europe/Paris
+    working_dir: /app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
+    depends_on:
+      - dev-schub-bff
 
-volumes:
-  mongo_data_dev:
+# Networks
 
 networks:
   schub-dev:

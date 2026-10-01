@@ -3,20 +3,13 @@ version: "3.8"
 # Volumes
 
 volumes:
-  # Sur le NVMe de loki : sur le RAID de dynamis, partagé avec les médias, Mongo attendait le disque
-  # (incident du 27-09). Chemin LOCAL À LOKI, à créer avant le déploiement (propriétaire 999,
-  # l'utilisateur de l'image mongo) : avec `o: bind`, Docker refuse un chemin absent.
+  # Dossier à créer sur loki avant le déploiement (propriétaire 999) : `o: bind` refuse un chemin absent.
   mongo_data:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: /mnt/volume/Schub/Mongo
-  # Le volume port_forwarding_config a été retiré le 17-09. Les règles permanentes vivaient
-  # dans /mnt/volume/PortForwarding/port-forwarding.yml, relu au démarrage ; depuis la phase 3
-  # elles sont en base (`static_port_rules`) et pilotées par l'API du cœur. LE FICHIER EXISTE
-  # TOUJOURS SUR LE DISQUE : son contenu doit être saisi dans `static_port_rules` avant le
-  # premier démarrage de la prod, sinon ces redirections ne seront plus tenues.
 
 # Secrets
 
@@ -29,31 +22,19 @@ secrets:
     external: true
   PORTAINER_TOKEN:
     external: true
-  # Mot de passe de l'utilisateur `bot`, créé par mongo-init-databases.js. Remplace les
-  # identifiants root que le connecteur Discord détenait jusqu'au 17-09.
   MONGO_BOT_PASSWORD:
     external: true
-  # Mot de passe de l'utilisateur `servers`, celui du cœur.
   MONGO_SERVERS_PASSWORD:
     external: true
-  # Mot de passe de l'utilisateur `riot`, celui du connecteur Riot. Il manquait ici alors que
-  # `mongo-init-databases.js` le lit pour créer l'utilisateur : sans lui, `task db:init:prod`
-  # ne créait pas le compte `riot` et le connecteur n'aurait pas pu se connecter. Ajouté le 18-09.
   MONGO_RIOT_PASSWORD:
     external: true
-  # Clé de l'API Riot. Une clé de développement expire toutes les 24 h : la prod exige une clé
-  # de production, demandée à Riot (lot D.1).
   RIOT_API_KEY:
     external: true
-  # Jeton d'appairage Freebox, obtenu via scripts/freebox-pair.sh du repo schub-connector-freebox.
   FREEBOX_APP_TOKEN:
     external: true
-  # Secret du client OAuth Discord : depuis le retrait du compte local (lot A.6), c'est la seule
-  # porte d'entrée du site. Le BFF le lit par configtree dans /run/secrets/.
   DISCORD_OAUTH_CLIENT_SECRET:
     external: true
-  # Secret partagé entre les services de la stack (en-tête X-Internal-Secret). Monté en fichier et lu par
-  # configtree : surtout pas en variable d'environnement, qui passerait avant le fichier pour Spring.
+  # Lu en fichier par configtree : en variable d'environnement, il passerait avant le fichier pour Spring.
   SCHUB_INTERNAL_SECRET:
     external: true
 
@@ -67,50 +48,35 @@ x-logging: &default-logging
     max-file: "3"
 
 # Services
-#
-# Images poussées par release.yml (repo Schub) -> release-docker.yml de chaque
-# sous-repo, sous le namespace Docker Hub thomasschultzschub. Le tag doit être
-# bumpé manuellement ici à chaque release (pas encore automatisé).
 
 services:
   schub-mongo:
     image: mongo:7
-    # --quiet : sans lui, chaque passage de la sonde écrit ses connexions dans le log.
-    command: ["mongod", "--quiet"]
     networks:
       - schub
+    volumes:
+      - mongo_data:/data/db
+    secrets:
+      - MONGO_ROOT_USERNAME
+      - MONGO_ROOT_PASSWORD
+      - MONGO_BOT_PASSWORD
+      - MONGO_SERVERS_PASSWORD
+      - MONGO_RIOT_PASSWORD
     environment:
       MONGO_INITDB_ROOT_USERNAME_FILE: /run/secrets/MONGO_ROOT_USERNAME
       MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/MONGO_ROOT_PASSWORD
       MONGO_INITDB_DATABASE: discordbot
       TZ: Europe/Paris
-    secrets:
-      - MONGO_ROOT_USERNAME
-      - MONGO_ROOT_PASSWORD
-      # Les mots de passe des utilisateurs de service, pour que `task db:init:prod` les lise
-      # DEPUIS LE SECRET plutôt qu'on les lui repasse à la main. Sans ça il existe deux sources
-      # de vérité — le secret que reçoit le service, et ce qu'on tape en créant l'utilisateur —
-      # et le moindre écart ne se voit qu'au démarrage suivant, en « AuthenticationFailed ».
-      # C'est ce qui a fait échouer le premier déploiement du 17-09.
-      - MONGO_BOT_PASSWORD
-      - MONGO_SERVERS_PASSWORD
-      - MONGO_RIOT_PASSWORD
-    volumes:
-      - mongo_data:/data/db
+    command: ["mongod", "--quiet"]
     healthcheck:
-      # Sonde TCP : mongosh ouvre cinq connexions par passage, chacune journalisée même en --quiet.
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27017"]
       interval: 10s
       timeout: 5s
       retries: 5
-      # Après un arrêt brutal, la récupération dépasse la minute sans ouvrir le port. Sans ce
-      # délai, Swarm tuait mongod en pleine récupération et chaque relance repartait de zéro.
+      # Après un arrêt brutal, la récupération dépasse la minute sans ouvrir le port.
       start_period: 15m
     logging: *default-logging
     deploy:
-      # Chaque démarrage raté préalloue des fichiers de journal de 100 Mo que mongod ne nettoie
-      # jamais : le 26-09, une boucle sans limite a rempli 2,2 To du RAID en 19 h. On abandonne
-      # après 5 échecs en 10 min, la base reste arrêtée jusqu'à intervention.
       restart_policy:
         condition: any
         delay: 10s
@@ -121,36 +87,20 @@ services:
           - node.labels.name == loki
 
   connector-discord:
-    image: thomasschultzschub/schub-connector-discord:v3.2.0
+    image: thomasschultzschub/schub-connector-discord:${SCHUB_RELEASE:?}
     networks:
       - schub
-    environment:
-      # Utilisateur propre à sa base, créé par `mongo-init-databases.js`. Le connecteur
-      # détenait les identifiants root jusqu'au 17-09 — plus aucun service ne les a.
-      MONGO_HOST: schub-mongo
-      MONGO_DB: discordbot
-      MONGO_USERNAME: bot
-      # DISCORD_ADMIN_ID et DISCORD_ADMIN_USERNAME ont été retirées le 18-09, à la fusion de
-      # schub-connector-discord#36 : l'identité vit dans le cœur, plus une ligne ici ne les lit.
-      # Au passage, la valeur qui était ici (245281978054737920 / `admin`) n'était PAS le compte
-      # de l'utilisateur : au premier déploiement, l'OWNER aurait été un compte tiers. La bonne
-      # valeur vit désormais sur `schub-core`, seul service qui sème ce compte.
-      # Depuis la phase 3, le connecteur ne connaît plus que le cœur : ni Portainer, ni la
-      # box, ni les redirections. Les variables correspondantes ont été retirées le 17-09,
-      # elles n'étaient plus lues par aucune ligne de code.
-      CORE_URL: http://schub-core:8080
-      TZ: Europe/Paris
     secrets:
       - SCHUB_INTERNAL_SECRET
-      # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
-      # via configtree, sans savoir de quel secret Swarm il vient.
       - source: MONGO_BOT_PASSWORD
         target: MONGO_PASSWORD
       - source: DISCORD_TOKEN
-    # ATTENTION : Docker Swarm IGNORE `depends_on`. Il ne sert qu'à un `docker compose up`
-    # local. En Swarm, l'ordre de démarrage ne s'exprime pas — c'est la `restart_policy`
-    # ci-dessous qui rattrape : le service meurt s'il ne joint pas Mongo, et Swarm le relance
-    # jusqu'à ce que ça passe. Les services doivent tolérer d'arriver trop tôt.
+    environment:
+      MONGO_HOST: schub-mongo
+      MONGO_DB: discordbot
+      MONGO_USERNAME: bot
+      CORE_URL: http://schub-core:8080
+      TZ: Europe/Paris
     depends_on:
       - schub-mongo
     logging: *default-logging
@@ -161,43 +111,28 @@ services:
         constraints:
           - node.labels.name == loki
 
-  # Le cœur : tout le domaine. Ajouté en phase 4 — il n'existait pas dans ce fichier, alors
-  # que le BFF n'a plus rien d'autre vers qui router le domaine.
-  #
-  # Préalable au premier démarrage : le secret Swarm MONGO_SERVERS_PASSWORD, et l'utilisateur
-  # `servers` créé par mongo-init-databases.js.
   schub-core:
-    image: thomasschultzschub/schub-core:v3.2.0
+    image: thomasschultzschub/schub-core:${SCHUB_RELEASE:?}
     networks:
       - schub
-    environment:
-      # Utilisateur propre à sa base. Le cœur n'a jamais connu les identifiants root.
-      MONGO_HOST: schub-mongo
-      MONGO_DB: servers
-      MONGO_USERNAME: servers
-      # Depuis le lot A.1, c'est LE CŒUR qui détient l'identité et sème le compte OWNER —
-      # à chaque démarrage, pas seulement à la première migration : c'est le garde-fou qui
-      # rend impossible de se verrouiller dehors en changeant les rôles.
-      DISCORD_ADMIN_ID: 227883780512153610
-      DISCORD_ADMIN_USERNAME: pisel
-      # Le cœur pilote les connecteurs ; il ne connaît ni Portainer ni la box.
-      CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
-      CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
-      CONNECTOR_DISCORD_URL: http://connector-discord:8080
-      # Lot D.4 : résolution d'un Riot ID en puuid à l'ajout d'un membre d'équipe.
-      CONNECTOR_RIOT_URL: http://connector-riot:8080
-      # Les redirections ont suivi le domaine dans le cœur à la phase 3. loki est le nœud où
-      # les stacks de jeu sont contraintes, donc la cible des redirections.
-      PORT_FORWARDING_ENABLED: "true"
-      # true au premier déploiement : le cœur lit la box et journalise ce qu'il ferait sans
-      # rien modifier. À repasser à false une fois les logs vérifiés.
-      PORT_FORWARDING_DRY_RUN: "true"
-      PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
-      TZ: Europe/Paris
     secrets:
       - SCHUB_INTERNAL_SECRET
       - source: MONGO_SERVERS_PASSWORD
         target: MONGO_PASSWORD
+    environment:
+      MONGO_HOST: schub-mongo
+      MONGO_DB: servers
+      MONGO_USERNAME: servers
+      DISCORD_ADMIN_ID: 227883780512153610
+      DISCORD_ADMIN_USERNAME: pisel
+      CONNECTOR_PORTAINER_URL: http://connector-portainer:8080
+      CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
+      CONNECTOR_DISCORD_URL: http://connector-discord:8080
+      CONNECTOR_RIOT_URL: http://connector-riot:8080
+      PORT_FORWARDING_ENABLED: "true"
+      PORT_FORWARDING_DRY_RUN: "true"
+      PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
+      TZ: Europe/Paris
     depends_on:
       - schub-mongo
     logging: *default-logging
@@ -209,15 +144,15 @@ services:
           - node.labels.name == loki
 
   connector-portainer:
-    image: thomasschultzschub/schub-connector-portainer:v3.2.0
+    image: thomasschultzschub/schub-connector-portainer:${SCHUB_RELEASE:?}
     networks:
       - schub
-    environment:
-      PORTAINER_VIRTUAL_HOST: http://admin-portainer:9000
-      TZ: Europe/Paris
     secrets:
       - SCHUB_INTERNAL_SECRET
       - source: PORTAINER_TOKEN
+    environment:
+      PORTAINER_VIRTUAL_HOST: http://admin-portainer:9000
+      TZ: Europe/Paris
     logging: *default-logging
     deploy:
       restart_policy:
@@ -226,30 +161,21 @@ services:
         constraints:
           - node.labels.name == loki
 
-  # Connecteur Riot — lot D.2. À la différence des connecteurs Portainer et Freebox, il POSSÈDE
-  # une base : il porte le cache des parties. Une partie terminée est immuable, donc collectée
-  # une seule fois et jamais redemandée — c'est une exigence d'architecture, pas une
-  # optimisation, et c'est ce qui rend le quota Riot presque théorique après le premier
-  # remplissage.
   connector-riot:
-    image: thomasschultzschub/schub-connector-riot:v3.2.0
+    image: thomasschultzschub/schub-connector-riot:${SCHUB_RELEASE:?}
     networks:
       - schub
+    secrets:
+      - SCHUB_INTERNAL_SECRET
+      - source: MONGO_RIOT_PASSWORD
+        target: MONGO_PASSWORD
+      - source: RIOT_API_KEY
     environment:
       MONGO_HOST: schub-mongo
       MONGO_DB: riot
       MONGO_USERNAME: riot
-      # 400 Go : loki garde de la place pour les serveurs de jeu qui partagent son NVMe.
       RIOT_STORAGE_ALERT_BYTES: "400000000000"
       TZ: Europe/Paris
-    secrets:
-      - SCHUB_INTERNAL_SECRET
-      # `target` renomme le fichier dans /run/secrets/ : l'application lit `MONGO_PASSWORD`
-      # par configtree, sans savoir de quel secret Swarm il vient.
-      - source: MONGO_RIOT_PASSWORD
-        target: MONGO_PASSWORD
-      - source: RIOT_API_KEY
-    # Rappel : Swarm ignore `depends_on`. C'est la restart_policy qui tient lieu d'ordre.
     depends_on:
       - schub-mongo
     logging: *default-logging
@@ -261,45 +187,33 @@ services:
           - node.labels.name == loki
 
   connector-freebox:
-    image: thomasschultzschub/schub-connector-freebox:v3.2.0
+    image: thomasschultzschub/schub-connector-freebox:${SCHUB_RELEASE:?}
     networks:
       - schub
-    environment:
-      # Identité de l'application côté Freebox (bloc infra, à changer si la box change).
-      FREEBOX_DEVICE_NAME: dynamis
-      TZ: Europe/Paris
     secrets:
       - SCHUB_INTERNAL_SECRET
       - source: FREEBOX_APP_TOKEN
+    environment:
+      FREEBOX_DEVICE_NAME: dynamis
+      TZ: Europe/Paris
     logging: *default-logging
     deploy:
       restart_policy:
         condition: any
       placement:
         constraints:
-          # Doit joindre mafreebox.freebox.fr sur le LAN : loki y est, comme dynamis.
           - node.labels.name == loki
 
   schub-front:
-    image: thomasschultzschub/schub-front:v3.2.0
+    image: thomasschultzschub/schub-front:${SCHUB_RELEASE:?}
     networks:
       - schub
-    # Le front parle au BFF, pas au connecteur Discord — son nginx a
-    # `proxy_pass http://schub-bff:8080/` en dur. (Et Swarm ignore depends_on de toute façon.)
-    depends_on:
-      - schub-bff
-    # SEUL service publié sur l'hôte. Le tunnel Cloudflare vit sur l'overlay `schub` et vise
-    # `http://schub-front:80` par nom de service : ce port n'existe donc que pour un accès
-    # direct depuis le LAN. Il peut disparaître si tu n'y accèdes que par schultz-thomas.fr.
-    #
-    # Les autres services ne publient RIEN, depuis le 17-09. Ils se joignent par nom sur
-    # l'overlay, et les publier revenait à exposer des API internes sur le LAN — c'est aussi
-    # ce qui a fait échouer le premier déploiement : 8081 était déjà pris par la stack
-    # Assetto Corsa, et 8082 par le BFF de ce même déploiement, à moitié monté.
     ports:
       - "8080:80"
     environment:
       TZ: Europe/Paris
+    depends_on:
+      - schub-bff
     logging: *default-logging
     deploy:
       restart_policy:
@@ -309,28 +223,19 @@ services:
           - node.labels.name == loki
 
   schub-bff:
-    image: thomasschultzschub/schub-bff:v3.2.0
+    image: thomasschultzschub/schub-bff:${SCHUB_RELEASE:?}
     networks:
       - schub
+    secrets:
+      - SCHUB_INTERNAL_SECRET
+      - DISCORD_OAUTH_CLIENT_SECRET
     environment:
-      # Le BFF est SANS ÉTAT depuis la phase 4 : la dépendance Mongo a été retirée (aucun
-      # repository ne l'utilisait) et avec elle les identifiants root qu'il détenait.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
-      # 900 s = 15 min, décision du 18-09. Le BFF réémet le jeton à chaque requête à laquelle
-      # il reste moins de la moitié de sa durée de vie : un utilisateur actif ne se reconnecte
-      # jamais, et un retrait de droit prend effet en 15 min au pire. La valeur de 3600 qui
-      # était ici ANNULAIT silencieusement cette décision — le code l'applique, le réglage
-      # l'écrasait. Arrive avec schub-back-bff#8.
       AUTH_JWT_EXPIRATION_SECONDS: 2592000
-      # Destinataire des messages du formulaire de contact.
       DISCORD_ADMIN_ID: 227883780512153610
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
-      # La connexion Discord est la seule depuis le lot A.6 : sans ces trois réglages, personne
-      # n'entre. L'URL doit être déclarée AU CARACTÈRE PRÈS dans le portail développeur Discord.
       DISCORD_OAUTH_CLIENT_ID: "449160985417089024"
       DISCORD_OAUTH_REDIRECT_URI: https://schultz-thomas.fr/api/auth/discord/callback
-      # Deux fronts, un BFF (Schub#31) : chacun reconnu par son hôte, avec son URL de retour Discord
-      # (à déclarer dans le portail développeur) et sa page d'arrivée. Leurs origines rejoignent le CORS.
       AUTH_FRONTS_0_KEY: schub
       AUTH_FRONTS_0_ORIGIN: https://schultz-thomas.fr
       AUTH_FRONTS_0_REDIRECTURI: https://schultz-thomas.fr/api/auth/discord/callback
@@ -339,15 +244,9 @@ services:
       AUTH_FRONTS_1_ORIGIN: https://premadelab.eu
       AUTH_FRONTS_1_REDIRECTURI: https://premadelab.eu/api/auth/discord/callback
       AUTH_FRONTS_1_POSTLOGINREDIRECT: /
-      # Les deux amonts, depuis la phase 4 : le domaine au cœur, Discord au connecteur.
       CORE_URL: http://schub-core:8080
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
       TZ: Europe/Paris
-    secrets:
-      - SCHUB_INTERNAL_SECRET
-      - DISCORD_OAUTH_CLIENT_SECRET
-    # Rappel : Swarm ignore `depends_on` (cf. schub-mongo). C'est la restart_policy qui tient
-    # lieu d'ordre de démarrage.
     depends_on:
       - schub-core
       - connector-discord
