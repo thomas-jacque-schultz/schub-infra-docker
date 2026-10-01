@@ -77,14 +77,14 @@ services:
     image: linuxserver/sonarr:4.0.19.2979-ls322
     networks:
       - schub
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Paris
     volumes:
       - sonarr_config:/config
       - media_series:/tv
       - media_downloads:/downloads
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Paris
     logging: *default-logging
     deploy:
       restart_policy:
@@ -97,14 +97,14 @@ services:
     image: linuxserver/radarr:6.3.0.10514-ls314
     networks:
       - schub
-    environment:
-      PUID: 1000
-      PGID: 1000
-      TZ: Europe/Paris
     volumes:
       - radarr_config:/config
       - media_movies:/movies
       - media_downloads:/downloads
+    environment:
+      PUID: 1000
+      PGID: 1000
+      TZ: Europe/Paris
     logging: *default-logging
     deploy:
       restart_policy:
@@ -117,12 +117,12 @@ services:
     image: jellyfin/jellyfin:10.11.11
     networks:
       - schub
-    environment:
-      TZ: Europe/Paris
     volumes:
       - jellyfin_data:/config
       - jellyfin_cache:/cache
       - media:/media:ro
+    environment:
+      TZ: Europe/Paris
     logging: *default-logging
     deploy:
       restart_policy:

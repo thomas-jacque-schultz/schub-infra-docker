@@ -49,4 +49,3 @@ services:
 networks:
   schub:
     external: true
-

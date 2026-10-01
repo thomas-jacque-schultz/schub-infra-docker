@@ -1,12 +1,6 @@
 version: "3.8"
 
-networks:
-  schub:
-    external: true
-  monitoring:
-    name: monitoring
-    driver: overlay
-    external: true
+# Volumes
 
 volumes:
   promtail_config:
@@ -28,6 +22,8 @@ volumes:
       device: /mnt/volume
       o: bind
 
+# Log Configuration
+
 x-logging:
   &default-logging
   driver: "json-file"
@@ -35,6 +31,8 @@ x-logging:
     tag: "{{.Name}}"
     max-size: "50m"
     max-file: "3"
+
+# Services
 
 services:
 
@@ -54,18 +52,18 @@ services:
 
   monitoring-cadvisor:
     image: ghcr.io/google/cadvisor:0.55.1
+    hostname: "{{.Node.Hostname}}"
     networks:
       - monitoring
-    hostname: "{{.Node.Hostname}}"
-    privileged: true
-    devices:
-      - /dev/kmsg:/dev/kmsg
     volumes:
       - "/:/rootfs:ro"
       - "/var/run:/var/run:ro"
       - "/sys:/sys:ro"
       - "/var/lib/docker:/var/lib/docker:ro"
       - "/dev:/dev:ro"
+    devices:
+      - /dev/kmsg:/dev/kmsg
+    privileged: true
     logging: *default-logging
     deploy:
       mode: global
@@ -91,6 +89,11 @@ services:
     image: ghcr.io/servercontainers/samba:smbd-wsdd2-a3.24.1-s4.23.8-r0
     networks:
       - schub
+    ports:
+      - target: 445
+        published: 445
+        protocol: tcp
+        mode: host
     volumes:
       - /mnt:/shares
       - /mnt/volume/Samba/smb.conf:/container/config/samba/smb.conf:ro
@@ -103,11 +106,6 @@ services:
       - "set -a; . /shares/volume/Samba/accounts.env; set +a; exec /container/scripts/entrypoint.sh \"$$@\""
       - sh
     command: ["runsvdir", "-P", "/container/config/runit"]
-    ports:
-      - target: 445
-        published: 445
-        protocol: tcp
-        mode: host
     logging: *default-logging
     deploy:
       mode: global
@@ -135,3 +133,12 @@ services:
       restart_policy:
         condition: any
 
+# Networks
+
+networks:
+  schub:
+    external: true
+  monitoring:
+    name: monitoring
+    driver: overlay
+    external: true

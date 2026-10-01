@@ -1,12 +1,14 @@
+# Volumes
 
-#Principale Network Configuration
+volumes:
+  palworld_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/Palworld/Palworld_Miam
 
-networks:
-  schub:
-    external: true
-
-
-#Log Configuration
+# Log Configuration
 
 x-logging:
   &default-logging
@@ -16,7 +18,7 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
-#Container Configuration
+# Services
 
 services:
 
@@ -29,7 +31,6 @@ services:
       - 27015:27015/udp
     volumes:
       - palworld_data:/palworld/
-    stop_grace_period: 30s # Set to however long you are willing to wait for the container to gracefully stop
     environment:
       AUTO_UPDATE_ENABLED: "true"
       PUID: 1000
@@ -52,6 +53,7 @@ services:
       AUTO_REBOOT_WARN_MINUTES: "10"
       AUTO_REBOOT_EVEN_IF_PLAYERS_ONLINE: "false"
       AUTO_REBOOT_CRON_EXPRESSION: "0 */4 * * *"
+    stop_grace_period: 30s # Set to however long you are willing to wait for the container to gracefully stop
     logging: *default-logging
     deploy:
       resources:
@@ -63,13 +65,8 @@ services:
         constraints:
           - node.labels.name == loki
 
+# Networks
 
-# Volume
-
-volumes:
-  palworld_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/Palworld/Palworld_Miam
+networks:
+  schub:
+    external: true

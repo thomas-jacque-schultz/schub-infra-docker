@@ -43,6 +43,8 @@ services:
     container_name: dymas-mysql
     networks:
       - schub
+    ports:
+      - "3306:3306"
     volumes:
       - dymas_mysql:/var/lib/mysql
     secrets:
@@ -53,8 +55,6 @@ services:
       MYSQL_DATABASE: dymas_shop
       MYSQL_USER: dymas_user
       MYSQL_PASSWORD_FILE: /run/secrets/DYMAS_MYSQL_PASSWORD
-    ports:
-      - "3306:3306"
     command: --default-authentication-plugin=mysql_native_password
     logging: *default-logging 
     deploy:
@@ -69,8 +69,8 @@ services:
     container_name: dymas-wordpress
     networks:
       - schub
-    depends_on:
-      - mysql
+    ports:
+      - "8095:80"
     volumes:
       - dymas_wordpress:/var/www/html
     secrets:
@@ -82,8 +82,8 @@ services:
       WORDPRESS_DB_PASSWORD_FILE: /run/secrets/DYMAS_MYSQL_PASSWORD
       WORDPRESS_TABLE_PREFIX: wp_
       WORDPRESS_DEBUG: "false"
-    ports:
-      - "8095:80"
+    depends_on:
+      - mysql
     logging: *default-logging 
     deploy:
       restart_policy:
@@ -97,8 +97,8 @@ services:
     container_name: dymas-phpmyadmin
     networks:
       - schub
-    depends_on:
-      - mysql
+    ports:
+      - "18080:80"
     secrets:
       - DYMAS_MYSQL_ROOT_PASSWORD
     environment:
@@ -106,8 +106,8 @@ services:
       PMA_USER: root
       PMA_PASSWORD_FILE: /run/secrets/DYMAS_MYSQL_ROOT_PASSWORD
       MYSQL_ROOT_PASSWORD_FILE: /run/secrets/DYMAS_MYSQL_ROOT_PASSWORD
-    ports:
-      - "18080:80"
+    depends_on:
+      - mysql
     logging: *default-logging 
     deploy:
       restart_policy:

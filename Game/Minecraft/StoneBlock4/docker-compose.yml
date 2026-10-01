@@ -1,9 +1,15 @@
-# Minecraft Stoneblock4 Stack Configuration for Docker Swarm
-networks:
-  schub:
-    external: true
+# Volumes
+
+volumes:
+  minecraft_stoneblock4_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/Minecraft/Stoneblock4
 
 # Secrets
+
 secrets:
   MINECRAFT_RCON_PASSWORD:
     external: true
@@ -11,6 +17,7 @@ secrets:
     external: true
 
 # Log Configuration
+
 x-logging:
   &default-logging
   driver: "json-file"
@@ -19,7 +26,8 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
-# Container Configuration
+# Services
+
 services:
   gaming-minecraft-stoneblock4:
     image: itzg/minecraft-server:java25
@@ -55,10 +63,9 @@ services:
         constraints:
           - node.labels.name == loki
 
-volumes:
-  minecraft_stoneblock4_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/Minecraft/Stoneblock4
+# Networks
+
+# Minecraft Stoneblock4 Stack Configuration for Docker Swarm
+networks:
+  schub:
+    external: true

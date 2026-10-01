@@ -105,14 +105,14 @@ services:
     image: ghcr.io/home-assistant-libs/python-matter-server:stable
     networks:
       - schub
+    ports:
+      - "5580:5580"
     volumes:
       - matter_config:/data
     environment:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Paris
-    ports:
-      - "5580:5580"
     logging: *default-logging
     deploy:
       restart_policy:
@@ -125,14 +125,14 @@ services:
     image: ghcr.io/bokub/ha-linky-amd64:1.7.0
     networks:
       - schub
+    volumes:
+      - linky_config:/data
     secrets:
       - LINKY_TOKEN
     environment:
       TZ: Europe/Paris
       HOME_ASSISTANT_TOKEN_FILE: /run/secrets/LINKY_TOKEN
       WS_URL: "ws://homeassistant-core:8123/api/websocket"
-    volumes:
-      - linky_config:/data
     logging: *default-logging
     deploy:
       restart_policy:
@@ -145,6 +145,11 @@ services:
     image: ghcr.io/blakeblackshear/frigate:stable
     networks:
       - schub
+    ports:
+      - "5000:5000"
+      - "8554:8554"   # RTSP streams
+      - "8555:8555/tcp"  # WebRTC over tcp
+      - "8555:8555/udp"  # WebRTC over udp
     volumes:
       - frigate_config:/config
       - frigate_media:/media/frigate
@@ -153,11 +158,6 @@ services:
       PUID: 1000
       PGID: 1000
       TZ: Europe/Paris
-    ports:
-      - "5000:5000"
-      - "8554:8554"   # RTSP streams
-      - "8555:8555/tcp"  # WebRTC over tcp
-      - "8555:8555/udp"  # WebRTC over udp
     logging: *default-logging
     deploy:
       restart_policy:
@@ -166,9 +166,8 @@ services:
         constraints:
           - node.labels.name == dynamis
 
-
-
 # Networks
+
 networks:
   schub:
     external: true

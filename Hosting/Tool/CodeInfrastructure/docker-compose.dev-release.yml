@@ -1,49 +1,43 @@
-# Rejoue une release publiée sur le dev : mêmes bases, mêmes réseaux, même configuration que le dev,
-# mais les images de Docker Hub au lieu des sources montées. C'est ce qui partira en prod, vérifié
-# avant la MEP. Se superpose à docker-compose.dev.yml :
-#
-#   task dev:release -- v3.1.1     # les images de cette version
-#   task dev                       # retour aux sources
-#
-# `!reset` retire du service de base ce qu'une image publiée n'a pas : le build et le code monté.
+# Se superpose à docker-compose.dev.yml : task dev:release -- vX.Y.Z
+
+# Services
 
 services:
   dev-connector-discord:
+    image: thomasschultzschub/schub-connector-discord:${SCHUB_RELEASE:?version à rejouer, par exemple v3.1.1}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-connector-discord:${SCHUB_RELEASE:?version à rejouer, par exemple v3.1.1}
 
   dev-connector-freebox:
+    image: thomasschultzschub/schub-connector-freebox:${SCHUB_RELEASE:?}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-connector-freebox:${SCHUB_RELEASE:?}
 
   dev-schub-core:
+    image: thomasschultzschub/schub-core:${SCHUB_RELEASE:?}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-core:${SCHUB_RELEASE:?}
 
   dev-connector-portainer:
+    image: thomasschultzschub/schub-connector-portainer:${SCHUB_RELEASE:?}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-connector-portainer:${SCHUB_RELEASE:?}
 
   dev-connector-riot:
+    image: thomasschultzschub/schub-connector-riot:${SCHUB_RELEASE:?}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-connector-riot:${SCHUB_RELEASE:?}
 
   dev-schub-bff:
+    image: thomasschultzschub/schub-bff:${SCHUB_RELEASE:?}
     build: !reset null
     volumes: !reset []
-    image: thomasschultzschub/schub-bff:${SCHUB_RELEASE:?}
 
-  # Le nginx de l'image vise schub-bff par défaut. Ce front est aussi sur l'overlay `schub`, où la
-  # prod publie ce nom : sans BFF_UPSTREAM, le dev servirait le BFF de prod.
+  # Sans BFF_UPSTREAM, le nginx de l'image viserait le BFF de prod sur l'overlay `schub`.
   dev-schub-front:
-    volumes: !reset []
-    working_dir: !reset null
-    command: !reset null
     image: thomasschultzschub/schub-front:${SCHUB_RELEASE:?}
+    volumes: !reset []
     environment:
       BFF_UPSTREAM: dev-schub-bff:8080
+    working_dir: !reset null
+    command: !reset null

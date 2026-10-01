@@ -1,10 +1,17 @@
 # Home Assistant Stack Configuration for Docker Swarm
 
-networks:
-  schub:
-    external: true
+# Volumes
+
+volumes:
+  actual_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/ActualBudget/Data
 
 # Log Configuration
+
 x-logging:
   &default-logging
   driver: "json-file"
@@ -13,7 +20,8 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
-# Container Configuration
+# Services
+
 services:
   actual:
     image: actualbudget/actual-server@sha256:6478d9ddfc0924479c09e6699c205e354c6f2216dfe7de3c0fb7b590d6edcdc5
@@ -29,11 +37,8 @@ services:
         constraints:  
           - node.labels.name == dynamis
 
+# Networks
 
-volumes:
-  actual_data:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /mnt/volume/ActualBudget/Data
+networks:
+  schub:
+    external: true
