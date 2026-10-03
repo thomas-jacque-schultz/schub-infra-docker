@@ -130,7 +130,7 @@ services:
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
       CONNECTOR_RIOT_URL: http://connector-riot:8080
       PORT_FORWARDING_ENABLED: "true"
-      PORT_FORWARDING_DRY_RUN: "true"
+      PORT_FORWARDING_DRY_RUN: "false"
       PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
       TZ: Europe/Paris
     depends_on:
