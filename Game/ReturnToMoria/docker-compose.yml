@@ -1,0 +1,63 @@
+# Volumes
+
+volumes:
+  moria_server:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/Return_To_Moria/server
+
+# Log Configuration
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    tag: "{{.Name}}"
+    max-size: "50m"
+    max-file: "3"
+
+# Services
+
+services:
+
+  gaming-return-to-moria:
+    image: andrewsav/moria:1.4.1
+    networks:
+      - schub
+    ports:
+      - "7778:7777/udp"
+    volumes:
+      - moria_server:/server
+    environment:
+      PUID: "1000"
+      PGID: "1000"
+    # Le serveur ne s'arrête proprement que sur SIGINT ; sinon sa session en ligne bloque le redémarrage ~5 min.
+    stop_signal: SIGINT
+    stop_grace_period: 120s
+    stdin_open: true
+    tty: true
+    # Le premier démarrage met à jour le serveur depuis Steam : les 5 min de l'image ne suffisent pas.
+    healthcheck:
+      start_period: 30m
+    logging: *default-logging
+    deploy:
+      update_config:
+        order: stop-first
+        failure_action: continue
+        delay: 30s
+      resources:
+        limits:
+          memory: 12G
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == loki
+
+# Networks
+
+networks:
+  schub:
+    external: true
