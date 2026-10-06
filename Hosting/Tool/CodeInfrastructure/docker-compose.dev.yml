@@ -109,6 +109,7 @@ services:
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
       CONNECTOR_RIOT_URL: http://dev-connector-riot:8080
       CONNECTOR_PREMADELAB_URL: http://dev-connector-premadelab:8080
+      PREMADELAB_URL: https://dev.premadelab.eu
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
