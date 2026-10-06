@@ -108,6 +108,8 @@ services:
       CONNECTOR_FREEBOX_URL: http://dev-connector-freebox:8080
       CONNECTOR_DISCORD_URL: http://dev-connector-discord:8080
       CONNECTOR_RIOT_URL: http://dev-connector-riot:8080
+      CONNECTOR_PREMADELAB_URL: http://dev-connector-premadelab:8080
+      PREMADELAB_URL: https://dev.premadelab.eu
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: ${PORT_FORWARDING_DRY_RUN:-true}
       TZ: Europe/Paris
@@ -136,6 +138,21 @@ services:
       SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       PORTAINER_VIRTUAL_HOST: ${PORTAINER_VIRTUAL_HOST}
       PORTAINER_TOKEN: ${PORTAINER_TOKEN}
+      TZ: Europe/Paris
+
+  dev-connector-premadelab:
+    build:
+      context: ../../../../Schub/schub-connector-discord-premadelab
+      dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+    ports:
+      - "127.0.0.1:18089:8080"
+    volumes:
+      - /home/pisel/projet/Schub/schub-connector-discord-premadelab/src:/usr/src/app/src
+    environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
+      DISCORD_PREMADELAB_TOKEN: ${DISCORD_PREMADELAB_TOKEN:-}
       TZ: Europe/Paris
 
   dev-connector-riot:
@@ -179,6 +196,8 @@ services:
       AUTH_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:18090,http://localhost:5173,http://dev.schultz-thomas.fr,https://dev.schultz-thomas.fr,http://192.168.1.200:18090}
       DISCORD_OAUTH_CLIENT_ID: ${DISCORD_OAUTH_CLIENT_ID}
       DISCORD_OAUTH_CLIENT_SECRET: ${DISCORD_OAUTH_CLIENT_SECRET}
+      DISCORD_PREMADELAB_OAUTH_CLIENT_ID: ${DISCORD_PREMADELAB_OAUTH_CLIENT_ID:-}
+      DISCORD_PREMADELAB_OAUTH_CLIENT_SECRET: ${DISCORD_PREMADELAB_OAUTH_CLIENT_SECRET:-}
       DISCORD_OAUTH_REDIRECT_URI: ${DISCORD_OAUTH_REDIRECT_URI:-http://localhost:18090/api/auth/discord/callback}
       AUTH_FRONTS_0_KEY: schub
       AUTH_FRONTS_0_ORIGIN: https://dev.schultz-thomas.fr

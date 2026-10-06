@@ -22,6 +22,11 @@ secrets:
     external: true
   PORTAINER_TOKEN:
     external: true
+  # Le bot de l'application Discord PremadeLab (Schub#100) : à créer avant le déploiement.
+  DISCORD_PREMADELAB_TOKEN:
+    external: true
+  DISCORD_PREMADELAB_OAUTH_CLIENT_SECRET:
+    external: true
   MONGO_BOT_PASSWORD:
     external: true
   MONGO_SERVERS_PASSWORD:
@@ -129,6 +134,7 @@ services:
       CONNECTOR_FREEBOX_URL: http://connector-freebox:8080
       CONNECTOR_DISCORD_URL: http://connector-discord:8080
       CONNECTOR_RIOT_URL: http://connector-riot:8080
+      CONNECTOR_PREMADELAB_URL: http://connector-premadelab:8080
       PORT_FORWARDING_ENABLED: "true"
       PORT_FORWARDING_DRY_RUN: "true"
       PORT_FORWARDING_DEFAULT_LAN_IP: 192.168.1.202
@@ -152,6 +158,23 @@ services:
       - source: PORTAINER_TOKEN
     environment:
       PORTAINER_VIRTUAL_HOST: http://admin-portainer:9000
+      TZ: Europe/Paris
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == loki
+
+  connector-premadelab:
+    image: thomasschultzschub/schub-connector-discord-premadelab:${SCHUB_RELEASE:?}
+    networks:
+      - schub
+    secrets:
+      - SCHUB_INTERNAL_SECRET
+      - source: DISCORD_PREMADELAB_TOKEN
+    environment:
       TZ: Europe/Paris
     logging: *default-logging
     deploy:
@@ -229,12 +252,15 @@ services:
     secrets:
       - SCHUB_INTERNAL_SECRET
       - DISCORD_OAUTH_CLIENT_SECRET
+      - DISCORD_PREMADELAB_OAUTH_CLIENT_SECRET
     environment:
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET}
       AUTH_JWT_EXPIRATION_SECONDS: 2592000
       DISCORD_ADMIN_ID: 227883780512153610
       AUTH_CORS_ALLOWED_ORIGINS: https://schultz-thomas.fr
       DISCORD_OAUTH_CLIENT_ID: "449160985417089024"
+      # L'application Discord PremadeLab pour premadelab.eu (Schub#101) ; vide, celle de Schub.
+      DISCORD_PREMADELAB_OAUTH_CLIENT_ID: ${DISCORD_PREMADELAB_OAUTH_CLIENT_ID:-}
       DISCORD_OAUTH_REDIRECT_URI: https://schultz-thomas.fr/api/auth/discord/callback
       AUTH_FRONTS_0_KEY: schub
       AUTH_FRONTS_0_ORIGIN: https://schultz-thomas.fr
