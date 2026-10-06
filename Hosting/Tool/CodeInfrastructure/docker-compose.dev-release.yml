@@ -23,6 +23,11 @@ services:
     build: !reset null
     volumes: !reset []
 
+  dev-connector-premadelab:
+    image: thomasschultzschub/schub-connector-discord-premadelab:${SCHUB_RELEASE:?}
+    build: !reset null
+    volumes: !reset []
+
   dev-connector-riot:
     image: thomasschultzschub/schub-connector-riot:${SCHUB_RELEASE:?}
     build: !reset null
