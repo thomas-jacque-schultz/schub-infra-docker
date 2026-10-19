@@ -21,12 +21,17 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
       MONGO_INITDB_DATABASE: ${MONGO_DB}
       TZ: Europe/Paris
-    command: ["mongod", "--quiet"]
+    # Sans plafond, WiredTiger prend la moitié de la RAM de dynamis (gel du 19/10).
+    command: ["mongod", "--quiet", "--wiredTigerCacheSizeGB", "2"]
     healthcheck:
       test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/27017"]
       interval: 10s
       timeout: 5s
       retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: 4G
 
   dev-connector-discord:
     build:
