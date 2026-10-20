@@ -52,6 +52,3 @@ services:
     build: !reset null
     volumes: !reset []
 
-  dev-schub-canvas-games:
-    image: thomasschultzschub/schub-canvas-games:${SCHUB_RELEASE:?}
-    build: !reset null
