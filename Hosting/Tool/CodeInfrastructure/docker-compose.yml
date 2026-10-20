@@ -232,9 +232,8 @@ services:
           - node.labels.name == loki
 
   # Les mini-jeux (Schub#118) : le tunnel envoie *.premadelab.eu/ws au relais, le reste aux fronts des jeux.
-  # Leurs images suivent leur propre version (GAMES_RELEASE) tant qu'elles ne sont pas dans la release de Schub.
   schub-together-games:
-    image: thomasschultzschub/schub-together-games:${GAMES_RELEASE:?}
+    image: thomasschultzschub/schub-together-games:${SCHUB_RELEASE:?}
     networks:
       - schub
     environment:
@@ -253,7 +252,7 @@ services:
           memory: 384M
 
   schub-canvas-games:
-    image: thomasschultzschub/schub-canvas-games:${GAMES_RELEASE:?}
+    image: thomasschultzschub/schub-canvas-games:${SCHUB_RELEASE:?}
     networks:
       - schub
     environment:

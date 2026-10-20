@@ -46,3 +46,12 @@ services:
       BFF_UPSTREAM: dev-schub-bff:8080
     working_dir: !reset null
     command: !reset null
+
+  dev-schub-together-games:
+    image: thomasschultzschub/schub-together-games:${SCHUB_RELEASE:?}
+    build: !reset null
+    volumes: !reset []
+
+  dev-schub-canvas-games:
+    image: thomasschultzschub/schub-canvas-games:${SCHUB_RELEASE:?}
+    build: !reset null
