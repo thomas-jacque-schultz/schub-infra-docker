@@ -122,7 +122,9 @@ services:
           - node.labels.name == dynamis
 
   homeassistant-linky:
-    image: ghcr.io/bokub/ha-linky-amd64:1.7.0
+    image: ghcr.io/bokub/ha-linky-amd64:1.9.0
+    # L'image ne lit que SUPERVISOR_TOKEN, pas de variante _FILE
+    entrypoint: ["/bin/sh", "-c", "SUPERVISOR_TOKEN=$$(cat /run/secrets/LINKY_TOKEN) exec /init ./run.sh"]
     networks:
       - schub
     volumes:
@@ -131,7 +133,6 @@ services:
       - LINKY_TOKEN
     environment:
       TZ: Europe/Paris
-      HOME_ASSISTANT_TOKEN_FILE: /run/secrets/LINKY_TOKEN
       WS_URL: "ws://homeassistant-core:8123/api/websocket"
     logging: *default-logging
     deploy:
