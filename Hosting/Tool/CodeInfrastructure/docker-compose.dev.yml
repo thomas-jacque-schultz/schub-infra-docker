@@ -241,6 +241,38 @@ services:
     depends_on:
       - dev-schub-bff
 
+  # Les mini-jeux (Schub#118) : le tunnel envoie dev-scribble.premadelab.eu/ws au relais, le reste aux fronts.
+  # Deux services : redéployer les fronts ne coupe pas les salons ouverts.
+  dev-schub-together-games:
+    build:
+      context: ../../../../Schub/schub-together-games
+      dockerfile: Dockerfile.dev
+    networks:
+      - schub-dev
+      - schub
+    volumes:
+      - /home/pisel/projet/Schub/schub-together-games/src:/usr/src/app/src
+    environment:
+      RELAY_ALLOWED_ORIGINS: https://dev-scribble.premadelab.eu
+      TZ: Europe/Paris
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  dev-schub-canvas-games:
+    build:
+      context: ../../../../Schub/schub-canvas-games
+    networks:
+      - schub-dev
+      - schub
+    environment:
+      TZ: Europe/Paris
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
 # Networks
 
 networks:
