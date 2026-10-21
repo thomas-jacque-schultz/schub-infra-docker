@@ -231,7 +231,7 @@ services:
         constraints:
           - node.labels.name == loki
 
-  # Les mini-jeux (Schub#118) : le relais (/ws) et les pages de tous les jeux, un sous-domaine par jeu.
+  # Le relais des mini-jeux (Schub#118) : /ws de <jeu>.premadelab.eu. Les pages sont servies par schub-front (Schub#139).
   schub-together-games:
     image: thomasschultzschub/schub-together-games:${SCHUB_RELEASE:?}
     networks:

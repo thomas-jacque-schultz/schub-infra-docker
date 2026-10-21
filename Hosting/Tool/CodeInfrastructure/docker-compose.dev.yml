@@ -241,8 +241,8 @@ services:
     depends_on:
       - dev-schub-bff
 
-  # Les mini-jeux (Schub#118) : un service sert le relais (/ws) et les pages, un sous-domaine par jeu
-  # (dev-scribble, dev-zoom). Les pages sont construites à l'image : un changement dans web/ demande un rebuild.
+  # Le relais des mini-jeux (Schub#118) : /ws de dev-<jeu>.premadelab.eu. Les pages sont servies par dev-schub-front
+  # (Schub#139).
   dev-schub-together-games:
     build:
       context: ../../../../Schub/schub-together-games
