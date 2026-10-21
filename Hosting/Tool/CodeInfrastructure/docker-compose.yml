@@ -231,13 +231,12 @@ services:
         constraints:
           - node.labels.name == loki
 
-  # Les mini-jeux (Schub#118) : le tunnel envoie *.premadelab.eu/ws au relais, le reste aux fronts des jeux.
+  # Le relais des mini-jeux (Schub#118) : /ws de <jeu>.premadelab.eu. Les pages sont servies par schub-front (Schub#139).
   schub-together-games:
     image: thomasschultzschub/schub-together-games:${SCHUB_RELEASE:?}
     networks:
       - schub
     environment:
-      RELAY_ALLOWED_ORIGINS: https://scribble.premadelab.eu
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
       TZ: Europe/Paris
     logging: *default-logging
@@ -250,23 +249,6 @@ services:
       resources:
         limits:
           memory: 384M
-
-  schub-canvas-games:
-    image: thomasschultzschub/schub-canvas-games:${SCHUB_RELEASE:?}
-    networks:
-      - schub
-    environment:
-      TZ: Europe/Paris
-    logging: *default-logging
-    deploy:
-      restart_policy:
-        condition: any
-      placement:
-        constraints:
-          - node.labels.name == loki
-      resources:
-        limits:
-          memory: 64M
 
   schub-front:
     image: thomasschultzschub/schub-front:${SCHUB_RELEASE:?}
