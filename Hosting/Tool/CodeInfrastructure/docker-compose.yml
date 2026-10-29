@@ -236,6 +236,9 @@ services:
     image: thomasschultzschub/schub-together-games:${SCHUB_RELEASE:?}
     networks:
       - schub
+    # Il vérifie les laissez-passer des salons d'équipe du Macro Planner (Schub#171), signés par le BFF.
+    secrets:
+      - SCHUB_INTERNAL_SECRET
     environment:
       JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
       TZ: Europe/Paris
