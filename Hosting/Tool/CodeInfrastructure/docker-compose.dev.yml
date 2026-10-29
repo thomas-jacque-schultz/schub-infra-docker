@@ -235,6 +235,8 @@ services:
       - /home/pisel/projet/Schub/schub-front-servers:/app
     environment:
       API_PROXY_TARGET: http://dev-schub-bff:8080
+      # Le /ws de dev.premadelab.eu : le Macro Planner d'une équipe (Schub#171).
+      RELAY_URL: ws://dev-schub-together-games:8080
       TZ: Europe/Paris
     working_dir: /app
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 80"
@@ -253,6 +255,7 @@ services:
     volumes:
       - /home/pisel/projet/Schub/schub-together-games/src:/usr/src/app/src
     environment:
+      SCHUB_INTERNAL_SECRET: ${SCHUB_INTERNAL_SECRET:-change-me-internal-secret}
       TZ: Europe/Paris
     deploy:
       resources:

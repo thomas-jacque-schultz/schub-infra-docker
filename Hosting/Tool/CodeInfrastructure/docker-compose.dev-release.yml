@@ -38,12 +38,13 @@ services:
     build: !reset null
     volumes: !reset []
 
-  # Sans BFF_UPSTREAM, le nginx de l'image viserait le BFF de prod sur l'overlay `schub`.
+  # Sans BFF_UPSTREAM ni RELAY_UPSTREAM, le nginx de l'image viserait le BFF et le relais de prod sur l'overlay `schub`.
   dev-schub-front:
     image: thomasschultzschub/schub-front:${SCHUB_RELEASE:?}
     volumes: !reset []
     environment:
       BFF_UPSTREAM: dev-schub-bff:8080
+      RELAY_UPSTREAM: dev-schub-together-games:8080
     working_dir: !reset null
     command: !reset null
 
