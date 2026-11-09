@@ -24,6 +24,12 @@ secrets:
   NEXTCLOUD_DB_ROOT_PASSWORD:
     external: true
 
+# Configs
+
+configs:
+  nextcloud_php_tuning_v1:
+    file: ./php-tuning.ini
+
 # Log Configuration
 
 x-logging:
@@ -34,6 +40,22 @@ x-logging:
     max-size: "50m"
     max-file: "3"
 
+# Nextcloud et son cron doivent partager la même configuration (Redis compris)
+
+x-nextcloud-environment:
+  &nextcloud-environment
+  MYSQL_HOST: nextcloud_db
+  MYSQL_DATABASE: nextcloud
+  MYSQL_USER: nextcloud
+  MYSQL_PASSWORD_FILE: /run/secrets/NEXTCLOUD_DB_PASSWORD
+  REDIS_HOST: redis
+  OVERWRITECLIURL: https://nextcloud.schultz-thomas.fr
+  OVERWRITEPROTOCOL: https
+  TRUSTED_PROXIES: 10.11.0.0/16
+  PHP_UPLOAD_LIMIT: 100G
+  PHP_MEMORY_LIMIT: 1G
+  PHP_OPCACHE_MEMORY_CONSUMPTION: 256
+
 # Services
 
 services:
@@ -41,21 +63,51 @@ services:
     image: nextcloud:33.0.8
     networks:
       - schub
+      - nextcloud
     volumes:
       - nextcloud_data:/var/www/html
     secrets:
       - NEXTCLOUD_DB_PASSWORD
-    environment:
-      MYSQL_HOST: nextcloud_db
-      MYSQL_DATABASE: nextcloud
-      MYSQL_USER: nextcloud
-      MYSQL_PASSWORD_FILE: /run/secrets/NEXTCLOUD_DB_PASSWORD
-      OVERWRITECLIURL: nextcloud.schultz-thomas.fr
-      OVERWRITEPROTOCOL: https
-      TRUSTED_PROXIES: "*"
-      PHP_UPLOAD_LIMIT: 100G
-      PHP_MEMORY_LIMIT: 100G
-    logging: *default-logging 
+    configs:
+      - source: nextcloud_php_tuning_v1
+        target: /usr/local/etc/php/conf.d/zz-tuning.ini
+    environment: *nextcloud-environment
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
+
+  cron:
+    image: nextcloud:33.0.8
+    entrypoint: /cron.sh
+    networks:
+      - schub
+      - nextcloud
+    volumes:
+      - nextcloud_data:/var/www/html
+    secrets:
+      - NEXTCLOUD_DB_PASSWORD
+    configs:
+      - source: nextcloud_php_tuning_v1
+        target: /usr/local/etc/php/conf.d/zz-tuning.ini
+    environment: *nextcloud-environment
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
+
+  redis:
+    image: redis:7.4.6-alpine
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    networks:
+      - nextcloud
+    logging: *default-logging
     deploy:
       restart_policy:
         condition: any
@@ -82,6 +134,7 @@ services:
 
   nextcloud_db:
     image: mariadb:12.3.3
+    command: --innodb-buffer-pool-size=1G --transaction-isolation=READ-COMMITTED
     networks:
       - schub
     volumes:
@@ -107,3 +160,5 @@ services:
 networks:
   schub:
     external: true
+  nextcloud:
+    driver: overlay
