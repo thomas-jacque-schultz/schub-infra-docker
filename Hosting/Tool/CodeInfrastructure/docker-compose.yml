@@ -257,8 +257,6 @@ services:
     image: thomasschultzschub/schub-front:${SCHUB_RELEASE:?}
     networks:
       - schub
-    ports:
-      - "8080:80"
     environment:
       TZ: Europe/Paris
     depends_on:
