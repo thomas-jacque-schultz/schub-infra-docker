@@ -1,0 +1,27 @@
+# Hors Swarm : un service Swarm ne peut pas recevoir de périphérique USB.
+# À lancer sur dynamis : docker compose -p zigbee2mqtt up -d
+# configuration.yaml (mot de passe MQTT) vit dans le dossier de données, pas ici.
+
+services:
+  zigbee2mqtt:
+    image: koenkk/zigbee2mqtt:2.6.3
+    container_name: zigbee2mqtt
+    restart: unless-stopped
+    networks:
+      - schub
+    devices:
+      - /dev/serial/by-id/usb-Itead_Sonoff_Zigbee_3.0_USB_Dongle_Plus_V2_1c15efa0b3f3ef11a281c41b6d9880ab-if00-port0:/dev/zigbee
+    volumes:
+      - /mnt/volume/HomeAssistant/Connecteurs/Zigbee2mqtt:/app/data
+      - /run/udev:/run/udev:ro
+    environment:
+      TZ: Europe/Paris
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  schub:
+    external: true
