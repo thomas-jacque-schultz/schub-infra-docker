@@ -1,0 +1,40 @@
+# Tri automatique de la boîte Free (imapfilter), toutes les 10 minutes.
+# Les règles (config.lua) restent sur dynamis : elles nomment des banques et des organismes, le dépôt est public.
+
+volumes:
+  mailfilter_config:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /mnt/volume/MailFilter
+
+secrets:
+  FREE_IMAP_PASSWORD:
+    external: true
+
+x-logging:
+  &default-logging
+  driver: "json-file"
+  options:
+    tag: "{{.Name}}"
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  mailfilter:
+    image: debian:12-slim
+    command: sh -c "apt-get update -qq && apt-get install -y -qq --no-install-recommends imapfilter ca-certificates && while true; do imapfilter -c /config/config.lua; sleep 600; done"
+    volumes:
+      - mailfilter_config:/config:ro
+    secrets:
+      - FREE_IMAP_PASSWORD
+    environment:
+      TZ: Europe/Paris
+    logging: *default-logging
+    deploy:
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.labels.name == dynamis
