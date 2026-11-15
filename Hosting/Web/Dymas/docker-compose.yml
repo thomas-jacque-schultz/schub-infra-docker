@@ -43,8 +43,6 @@ services:
     container_name: dymas-mysql
     networks:
       - schub
-    ports:
-      - "3306:3306"
     volumes:
       - dymas_mysql:/var/lib/mysql
     secrets:
@@ -97,8 +95,6 @@ services:
     container_name: dymas-phpmyadmin
     networks:
       - schub
-    ports:
-      - "18080:80"
     secrets:
       - DYMAS_MYSQL_ROOT_PASSWORD
     environment:
